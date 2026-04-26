@@ -86,10 +86,19 @@ def get_global_tickers():
     tickers = set()
     try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-        resp = requests.get(url, headers=session.headers, timeout=10)
-        table = pd.read_html(StringIO(resp.text))[0]
-        tickers.update([t.replace('.', '-') for t in table['Symbol'].tolist()])
-    except: pass
+        # Ensure headers are friendly and use the requests session
+        session.headers.update({'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9', 'Accept-Language': 'en-US,en;q=0.9'})
+        resp = session.get(url, timeout=10)
+        if resp.status_code == 200:
+            table = pd.read_html(StringIO(resp.text))[0]
+            tickers.update([t.replace('.', '-') for t in table['Symbol'].tolist()])
+        else:
+            # fallback: don't abort, continue with TA35
+            print(f"get_global_tickers: Wikipedia returned status {resp.status_code}")
+    except Exception as e:
+        # network issues can cause HTTPError; swallow and continue with local list
+        print(f"get_global_tickers error: {e}")
+        pass
     tickers.update(TA35)
     return list(tickers)
 
@@ -176,7 +185,7 @@ m_data = fetch_deep_data(WATCHLIST)
 with t_port:
     # מצב עריכה
     with st.expander("⚙️ Edit Raw Data"):
-        edit_df = st.data_editor(st.session_state.portfolio.reset_index(), num_rows="dynamic", use_container_width=True)
+        edit_df = st.data_editor(st.session_state.portfolio.reset_index(), num_rows="dynamic", width='stretch')
         if st.button("Save Changes"):
             st.session_state.portfolio = edit_df.dropna(subset=['Ticker']).set_index('Ticker')
             save_cloud_portfolio(st.session_state.portfolio)
@@ -196,7 +205,7 @@ with t_port:
             rows.append({
                 "Ticker": t, "Sector": d['sector'], "Qty": qty, "Last": d['price'],
                 "P&L %": ((d['price']-bp)/bp)*100, "Beta": d['beta'], "Div %": d['div']*100,
-                "RSI": d['rsi'], "Value USD": v_u, "Curr": "₪" if d['currency']=="ILS" else "$"
+                "RSI": d['rsi'], "Value USD": v_u, "Curr": "₪" if d['currency']=="ILS" else "$", "SMA200": d.get('sma200', np.nan)
             })
 
     col_a, col_b, col_c = st.columns(3)
@@ -207,7 +216,7 @@ with t_port:
     v_mode = st.radio("Display Mode:", ["Desktop", "Mobile"], horizontal=True)
     if v_mode == "Desktop":
         if rows:
-            st.dataframe(pd.DataFrame(rows).sort_values("Value USD", ascending=False).drop(columns="Value USD"), use_container_width=True)
+            st.dataframe(pd.DataFrame(rows).sort_values("Value USD", ascending=False).drop(columns="Value USD"), width='stretch')
     else:
         for r in sorted(rows, key=lambda x: x['Value USD'], reverse=True):
             with st.container(border=True):
@@ -226,10 +235,10 @@ with t_scan:
             c1, c2 = st.columns(2)
             with c1:
                 st.write("💰 Value Plays (P/E < 15)")
-                st.dataframe(df_s[(df_s['pe']>0)&(df_s['pe']<15)].sort_values('pe').head(20), use_container_width=True)
+                st.dataframe(df_s[(df_s['pe']>0)&(df_s['pe']<15)].sort_values('pe').head(20), width='stretch')
             with c2:
                 st.write("🔥 Momentum (Price > 200SMA & RSI < 55)")
-                st.dataframe(df_s[(df_s['price']>df_s['sma200'])&(df_s['rsi']<55)].sort_values('rsi').head(20), use_container_width=True)
+                st.dataframe(df_s[(df_s['price']>df_s['sma200'])&(df_s['rsi']<55)].sort_values('rsi').head(20), width='stretch')
 
 with t_ai:
     at = st.text_input("Ticker for AI Analysis", value="NVDA").upper()
@@ -248,21 +257,24 @@ with t_ai:
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=df.tail(60).index, y=df.tail(60)['Close'], name='Actual'))
                 fig.add_trace(go.Scatter(x=fd, y=p, name='AI Forecast', line=dict(dash='dash')))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=False, width='stretch')
 
 with t_advisor:
     for r in rows:
         with st.expander(f"Strategy: {r['Ticker']}"):
-            if r['rsi'] > 70: st.warning("Overbought: RSI is very high. Consider taking profits.")
-            if r['Last'] < r['Beta']: st.error("Price below long term trend.")
-            st.write(f"Beta: {r['Beta']} | Dividend: {r['Div %']:.2f}%")
+            # Use the correct keys and compare price to the SMA200 (long-term trend)
+            if r.get('RSI', 0) > 70:
+                st.warning("Overbought: RSI is very high. Consider taking profits.")
+            if r.get('Last', 0) < r.get('SMA200', float('inf')):
+                st.error("Price below long term trend (200 SMA).")
+            st.write(f"Beta: {r.get('Beta', 0)} | Dividend: {r.get('Div %', 0):.2f}%")
 
 with t_journal:
     st.subheader("📜 Activity Log")
     try:
         logs = conn.read(worksheet="Activity", ttl=0)
         if logs is not None and not logs.empty:
-            st.dataframe(logs.sort_values("Date", ascending=False), use_container_width=True)
+            st.dataframe(logs.sort_values("Date", ascending=False), width='stretch')
             st.markdown("---")
             st.subheader("🧠 Performance Feedback")
             st.info("Insights: You are currently balanced. Focus on high RSI stocks for potential exits.")
