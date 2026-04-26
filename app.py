@@ -247,8 +247,9 @@ with tab_port:
     overall_pnl = total_val_usd - total_invested_usd - st.session_state.config['cash_usd'] - (st.session_state.config['cash_ils'] / usd_ils_rate)
     col3.metric("Unrealized P&L ($)", f"${overall_pnl:,.2f}")
     
-    # Portfolio Volatility (Beta)
-    port_beta = total_beta_weight / (total_val_usd - st.session_state.config['cash_usd'] - (st.session_state.config['cash_ils']/usd_ils_rate)) if total_val_usd > 0 else 1.0
+    # Portfolio Volatility (Beta) - Safe Zero Division Check
+    stock_market_value = total_val_usd - st.session_state.config['cash_usd'] - (st.session_state.config['cash_ils'] / usd_ils_rate)
+    port_beta = (total_beta_weight / stock_market_value) if stock_market_value > 0 else 1.0
     col4.metric("Portfolio Beta (Risk)", f"{port_beta:.2f}", delta="> 1.0 is highly volatile" if port_beta > 1.0 else "< 1.0 is defensive", delta_color="inverse")
 
     view_mode = st.radio("Display Mode:", ["Desktop (Deep Data)", "Mobile (Cards)"], horizontal=True)
