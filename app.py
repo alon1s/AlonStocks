@@ -33,17 +33,21 @@ def load_cloud_portfolio():
     try:
         df = conn.read(worksheet="Portfolio", ttl=0)
         if df.empty or 'Ticker' not in df.columns:
-            return pd.DataFrame(columns=['Quantity', 'PurchasePrice']).set_index('Ticker')
+            # כאן תוקן הבאג: הוספתי את 'Ticker' לרשימת העמודות
+            return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
         return df.set_index('Ticker')
-    except:
-        return pd.DataFrame(columns=['Quantity', 'PurchasePrice']).set_index('Ticker')
+    except Exception as e:
+        # אם יש שגיאת חיבור, נחזיר טבלה ריקה תקינה כדי למנוע קריסה
+        return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
 
 def save_cloud_portfolio(df):
     try:
         df_save = df.reset_index()
         conn.update(worksheet="Portfolio", data=df_save)
         return True
-    except: return False
+    except Exception as e:
+        st.sidebar.error("שגיאה בשמירה לענן. ודא שהגיליון מוגדר כ'פתוח לעריכה'.")
+        return False
 
 def log_activity(ticker, action, qty, price, notes=""):
     try:
@@ -52,7 +56,11 @@ def log_activity(ticker, action, qty, price, notes=""):
             "Ticker": ticker, "Action": action, "Quantity": float(qty),
             "Price": float(price), "Notes": notes
         }])
-        existing = conn.read(worksheet="Activity", ttl=0)
+        try:
+            existing = conn.read(worksheet="Activity", ttl=0)
+        except:
+            existing = pd.DataFrame()
+            
         updated = pd.concat([existing, new_log], ignore_index=True) if not existing.empty else new_log
         conn.update(worksheet="Activity", data=updated)
     except: pass
