@@ -13,14 +13,13 @@ import requests
 from io import StringIO
 import concurrent.futures
 import time
-import random
 
 # ==========================================
 # 1. Configuration & Cloud Sync
 # ==========================================
 st.set_page_config(page_title="AlonStocks: Strategic Quant", layout="wide", page_icon="📈")
 
-# Browser disguise
+# Browser disguise (For Wikipedia lists only)
 session = requests.Session()
 session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
 
@@ -84,6 +83,19 @@ WATCHLIST.sort()
 def get_usd_ils():
     try: return yf.Ticker("USDILS=X").fast_info['lastPrice']
     except: return 3.75
+
+# הפונקציה שהייתה חסרה לך בקוד הקודם!
+@st.cache_data(ttl=3600)
+def get_global_tickers():
+    tickers = set()
+    try:
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        resp = requests.get(url, headers=session.headers, timeout=10)
+        table = pd.read_html(StringIO(resp.text))[0]
+        tickers.update([t.replace('.', '-') for t in table['Symbol'].tolist()])
+    except: pass
+    tickers.update(TA35)
+    return list(tickers)
 
 @st.cache_data(ttl=1200)
 def fetch_deep_data(tickers_to_fetch):
@@ -163,7 +175,7 @@ t_port, t_scan, t_ai, t_advisor, t_journal = st.tabs(["💼 My Portfolio", "🔎
 m_data = fetch_deep_data(WATCHLIST)
 
 with t_port:
-    # Logic for customized Profit calculation
+    # תוקן השימוש ב-use_container_width
     cash_usd = st.session_state.config['cash_usd']
     cash_ils = st.session_state.config['cash_ils']
     
@@ -182,7 +194,6 @@ with t_port:
     total_equity_usd = stock_val_usd + cash_usd + (cash_ils / usd_ils_rate)
     total_equity_ils = total_equity_usd * usd_ils_rate
 
-    # Custom Baselines: 7,000 USD / 25,500 ILS
     profit_usd = total_equity_usd - 7000
     profit_ils = total_equity_ils - 25500
     profit_pct_usd = (profit_usd / 7000) * 100
@@ -198,7 +209,8 @@ with t_port:
 
     st.divider()
     if rows:
-        st.dataframe(pd.DataFrame(rows).sort_values("Value USD", ascending=False).drop(columns="Value USD"), use_container_width=True)
+        # תוקנה שורת האזהרה
+        st.dataframe(pd.DataFrame(rows).sort_values("Value USD", ascending=False).drop(columns="Value USD"), width='stretch')
 
 with t_advisor:
     st.subheader("🧠 Master Quant Advisor: Knowledge Base")
@@ -206,7 +218,6 @@ with t_advisor:
     
     for r in rows:
         with st.expander(f"Strategy Review for {r['Ticker']}"):
-            # Row 1: RSI & Beta
             col_a1, col_a2 = st.columns(2)
             
             rsi_val = r['RSI']
@@ -221,10 +232,9 @@ with t_advisor:
             if beta_val > 1.2: col_a2.warning("⚡ High Volatility")
             elif beta_val < 0.8: col_a2.success("🛡️ Defensive")
             else: col_a2.write("📏 Market-like")
-            col_a2.caption("💡 **החוק:** Beta מודדת סיכון. גבוה מ-1.0 אומר שהמניה תנודתית יותר מהשוק (רווח גבוה/הפסד גבוה). נמוך מ-1.0 אומר שהיא יציבה יותר.")
+            col_a2.caption("💡 **החוק:** Beta מודדת סיכון. גבוה מ-1.0 אומר שהמניה תנודתית יותר מהשוק. נמוך מ-1.0 אומר שהיא יציבה יותר.")
 
             st.divider()
-            # Row 2: Dividends & P/E
             col_b1, col_b2 = st.columns(2)
             
             div_val = r['Div %']
@@ -241,20 +251,19 @@ with t_advisor:
             else: col_b2.write("📊 Average")
             col_b2.caption("💡 **החוק:** מכפיל רווח. נמוך אומר שהמניה 'זולה' ביחס לרווחים שלה. גבוה אומר שאתה משלם הרבה על פוטנציאל עתידי.")
 
-            # Row 3: Distance from High
             dh_val = r['Dist.High']
             st.markdown(f"#### Distance from 52-Week High: **{dh_val:.2f}%**")
             if dh_val < -20: st.success(f"📉 'Buy the Dip' Opportunity: המניה ירדה משמעותית מהשיא שלה.")
-            st.caption("💡 **החוק:** כמה המניה רחוקה מהשיא השנתי שלה. מספר שלילי גבוה (למשל 20%-) יכול להיות הזדמנות קנייה בזול.")
+            st.caption("💡 **החוק:** כמה המניה רחוקה מהשיא השנתי שלה. מספר שלילי גבוה יכול להיות הזדמנות קנייה בזול.")
 
-# (Rest of the tabs: Scanner, AI, Journal remain with existing robust logic)
 with t_scan:
     if st.button("🚀 Run Global Scan"):
         with st.spinner("Analyzing..."):
             all_ticks = get_global_tickers(); s_data = fetch_deep_data(all_ticks); df_s = pd.DataFrame(s_data).T
             c_s1, c_s2 = st.columns(2)
-            c_s1.write("💰 Value (P/E < 15)"); c_s1.dataframe(df_s[(df_s['pe']>0)&(df_s['pe']<15)].sort_values('pe').head(15), use_container_width=True)
-            c_s2.write("🔥 Momentum (RSI < 55)"); c_s2.dataframe(df_s[(df_s['price']>df_s['sma200'])&(df_s['rsi']<55)].sort_values('rsi').head(15), use_container_width=True)
+            # תוקנה שורת האזהרה
+            c_s1.write("💰 Value (P/E < 15)"); c_s1.dataframe(df_s[(df_s['pe']>0)&(df_s['pe']<15)].sort_values('pe').head(15), width='stretch')
+            c_s2.write("🔥 Momentum (RSI < 55)"); c_s2.dataframe(df_s[(df_s['price']>df_s['sma200'])&(df_s['rsi']<55)].sort_values('rsi').head(15), width='stretch')
 
 with t_ai:
     a_ticker = st.text_input("Ticker to Predict", value="NVDA").upper()
@@ -268,6 +277,7 @@ with t_ai:
             preds = model.predict(df.tail(7)[['SMA10', 'SMA50', 'Vol', 'Mom']].bfill())
             f_dates = [df.index[-1] + timedelta(days=i) for i in range(1, 8)]
             fig = go.Figure(); fig.add_trace(go.Scatter(x=df.tail(60).index, y=df.tail(60)['Close'], name='Actual')); fig.add_trace(go.Scatter(x=f_dates, y=preds, name='AI Forecast', line=dict(dash='dash')))
+            # תוקנה שורת האזהרה לגרפים
             st.plotly_chart(fig, use_container_width=True)
 
 with t_journal:
@@ -275,5 +285,6 @@ with t_journal:
     try:
         activity = conn.read(worksheet="Activity", ttl=0)
         if activity is not None and not activity.empty:
-            st.dataframe(activity.sort_values("Date", ascending=False), use_container_width=True)
+            # תוקנה שורת האזהרה
+            st.dataframe(activity.sort_values("Date", ascending=False), width='stretch')
     except: st.warning("Trading log is currently empty.")
