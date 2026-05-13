@@ -95,23 +95,96 @@ session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+def safe_conn_read(worksheet, ttl=0, retries=3, backoff=2):
+    for attempt in range(retries):
+        try:
+            df = conn.read(worksheet=worksheet, ttl=ttl)
+            if df is None:
+                return pd.DataFrame()
+            return df
+        except Exception as e:
+            print(f"safe_conn_read error for '{worksheet}' (attempt {attempt + 1}/{retries}): {e}")
+            time.sleep(backoff ** attempt)
+    return pd.DataFrame()
+
+
+def normalize_portfolio_df(df):
+    if df is None or df.empty:
+        return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
+
+    cleaned = df.copy()
+    cleaned.columns = [str(col).strip() for col in cleaned.columns]
+
+    rename_map = {}
+    for col in cleaned.columns:
+        key = str(col).strip().lower().replace(' ', '')
+        if key in {'ticker', 'symbol'}:
+            rename_map[col] = 'Ticker'
+        elif key in {'quantity', 'qty', 'shares'}:
+            rename_map[col] = 'Quantity'
+        elif key in {'purchaseprice', 'buyprice', 'costbasis', 'avgprice', 'averageprice'}:
+            rename_map[col] = 'PurchasePrice'
+        elif key == 'index' and 'Ticker' not in rename_map.values():
+            rename_map[col] = 'Ticker'
+
+    cleaned = cleaned.rename(columns=rename_map)
+
+    if 'Ticker' not in cleaned.columns and cleaned.index.name is not None:
+        cleaned = cleaned.reset_index()
+        cleaned.columns = [str(col).strip() for col in cleaned.columns]
+
+    if 'Ticker' not in cleaned.columns:
+        first_col = cleaned.columns[0]
+        cleaned = cleaned.rename(columns={first_col: 'Ticker'})
+
+    if 'Quantity' not in cleaned.columns:
+        cleaned['Quantity'] = 0.0
+    if 'PurchasePrice' not in cleaned.columns:
+        cleaned['PurchasePrice'] = 0.0
+
+    cleaned = cleaned[['Ticker', 'Quantity', 'PurchasePrice']]
+    cleaned = cleaned.dropna(subset=['Ticker'])
+    cleaned['Ticker'] = cleaned['Ticker'].astype(str).str.strip()
+    cleaned = cleaned[cleaned['Ticker'] != '']
+    cleaned['Quantity'] = pd.to_numeric(cleaned['Quantity'], errors='coerce').fillna(0.0)
+    cleaned['PurchasePrice'] = pd.to_numeric(cleaned['PurchasePrice'], errors='coerce').fillna(0.0)
+    return cleaned.set_index('Ticker')
+
+
+def load_local_portfolio_fallback():
+    local_path = os.path.join(os.path.dirname(__file__), 'portfolio_data.csv')
+    if os.path.exists(local_path):
+        try:
+            return normalize_portfolio_df(pd.read_csv(local_path))
+        except Exception as e:
+            print(f"Local portfolio fallback failed: {e}")
+    return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
+
 def load_cloud_portfolio():
     try:
-        df = conn.read(worksheet="Portfolio", ttl=0)
-        if df is None or df.empty:
-            return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
-        df = df.dropna(subset=['Ticker'])
-        df = df[df['Ticker'].astype(str).str.strip() != ""]
-        return df.set_index('Ticker')
-    except:
-        return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
+        df = safe_conn_read("Portfolio", ttl=0)
+        normalized = normalize_portfolio_df(df)
+        if normalized.empty:
+            return load_local_portfolio_fallback()
+        return normalized
+    except Exception as e:
+        print(f"load_cloud_portfolio error: {e}")
+        return load_local_portfolio_fallback()
 
 def save_cloud_portfolio(df):
     try:
-        conn.update(worksheet="Portfolio", data=df.reset_index())
+        payload = df.reset_index()
+        payload.columns = [str(col).strip() for col in payload.columns]
+        conn.update(worksheet="Portfolio", data=payload)
+        try:
+            local_path = os.path.join(os.path.dirname(__file__), 'portfolio_data.csv')
+            payload.to_csv(local_path, index=False)
+        except Exception as e:
+            print(f"save_cloud_portfolio local cache error: {e}")
         st.cache_data.clear()
         return True
-    except:
+    except Exception as e:
+        print(f"save_cloud_portfolio error: {e}")
         return False
 
 def log_activity(ticker, action, qty, price, notes=""):
@@ -122,7 +195,7 @@ def log_activity(ticker, action, qty, price, notes=""):
             "Quantity": float(qty), "Price": float(price), "Notes": notes
         }])
         try:
-            existing = conn.read(worksheet="Activity", ttl=0)
+            existing = safe_conn_read("Activity", ttl=0)
         except:
             existing = pd.DataFrame()
         updated = pd.concat([existing, new_log], ignore_index=True) if not existing.empty else new_log
@@ -130,8 +203,8 @@ def log_activity(ticker, action, qty, price, notes=""):
     except:
         pass
 
-if 'portfolio' not in st.session_state:
-    st.session_state.portfolio = load_cloud_portfolio()
+# Always hydrate from the cloud sheet so the app reflects DB changes on every rerun.
+st.session_state.portfolio = load_cloud_portfolio()
 
 CONFIG_FILE = "config.json"
 def load_config():
@@ -602,6 +675,11 @@ with st.sidebar.form("trade_form", clear_on_submit=True):
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔎 בדיקת מניה ספציפית")
 quick_ticker = st.sidebar.text_input("הכנס סימול לניתוח מהיר").upper()
+
+if st.sidebar.button("🔄 רענון תיק מה-DB"):
+    st.session_state.portfolio = load_cloud_portfolio()
+    st.cache_data.clear()
+    st.rerun()
 
 # ==========================================
 # 4. MAIN TABS
@@ -1206,10 +1284,10 @@ with t_journal:
     st.subheader("📜 יומן פעולות")
     
     try:
-        logs = conn.read(worksheet="Activity", ttl=0)
+        logs = safe_conn_read("Activity", ttl=0)
         if logs is not None and not logs.empty:
             logs_sorted = logs.sort_values("Date", ascending=False)
-            st.dataframe(logs_sorted, use_container_width=True)
+            st.dataframe(logs_sorted, width='stretch')
             
             # Stats
             buys = logs[logs['Action'] == 'Buy']
