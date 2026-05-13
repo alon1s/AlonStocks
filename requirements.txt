@@ -1,0 +1,9 @@
+streamlit
+yfinance
+pandas
+numpy
+scikit-learn
+plotly
+requests
+lxml
+st-gsheets-connection
