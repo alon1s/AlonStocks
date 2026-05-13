@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import os
 import json
-import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.ensemble import RandomForestRegressor
 from datetime import datetime, timedelta
@@ -17,9 +16,8 @@ import time
 # ==========================================
 # 1. הגדרות וחיבור לענן
 # ==========================================
-st.set_page_config(page_title="AlonStocks: Strategic Mentor", layout="wide", page_icon="📈")
+st.set_page_config(page_title="AlonStocks: Expert Advisor", layout="wide", page_icon="🏦")
 
-# מניעת חסימות בויקיפדיה
 session = requests.Session()
 session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
 
@@ -28,13 +26,11 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def load_cloud_portfolio():
     try:
         df = conn.read(worksheet="Portfolio", ttl=0)
-        if df is None or df.empty:
-            return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
+        if df is None or df.empty: return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
         df = df.dropna(subset=['Ticker'])
         df = df[df['Ticker'].astype(str).str.strip() != ""]
         return df.set_index('Ticker')
-    except:
-        return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
+    except: return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
 
 def save_cloud_portfolio(df):
     try:
@@ -45,32 +41,24 @@ def save_cloud_portfolio(df):
 
 def log_activity(ticker, action, qty, price, notes=""):
     try:
-        new_log = pd.DataFrame([{
-            "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Ticker": ticker, "Action": action, "Quantity": float(qty),
-            "Price": float(price), "Notes": notes
-        }])
-        try:
-            existing = conn.read(worksheet="Activity", ttl=0)
+        new_log = pd.DataFrame([{"Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Ticker": ticker, "Action": action, "Quantity": float(qty), "Price": float(price), "Notes": notes}])
+        try: existing = conn.read(worksheet="Activity", ttl=0)
         except: existing = pd.DataFrame()
         updated = pd.concat([existing, new_log], ignore_index=True) if not existing.empty else new_log
         conn.update(worksheet="Activity", data=updated)
     except: pass
 
-if 'portfolio' not in st.session_state:
-    st.session_state.portfolio = load_cloud_portfolio()
+if 'portfolio' not in st.session_state: st.session_state.portfolio = load_cloud_portfolio()
 
 CONFIG_FILE = "config.json"
 def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r') as f: return json.load(f)
     return {"cash_usd": 86.67, "cash_ils": 0.0}
-
-if 'config' not in st.session_state:
-    st.session_state.config = load_config()
+if 'config' not in st.session_state: st.session_state.config = load_config()
 
 # ==========================================
-# 2. מנוע נתונים
+# 2. מנוע נתונים ואנליזה מתקדמת
 # ==========================================
 @st.cache_data(ttl=600)
 def get_usd_ils():
@@ -86,34 +74,56 @@ def get_global_tickers():
         table = pd.read_html(StringIO(resp.text))[0]
         tickers.update([t.replace('.', '-') for t in table['Symbol'].tolist()])
     except: pass
-    tickers.update(['ESLT.TA', 'NICE.TA', 'LUMI.TA', 'POLI.TA', 'ICL.TA', 'DSCT.TA'])
     return list(tickers)
 
 @st.cache_data(ttl=1200)
-def fetch_deep_data(tickers_to_fetch):
+def fetch_expert_data(tickers_to_fetch):
     data = {}
     valid_list = [t for t in tickers_to_fetch if isinstance(t, str) and t.strip()]
+    
     def fetch_single(t):
         try:
             stock = yf.Ticker(t)
             hist = stock.history(period="1y")
-            if len(hist) < 20: return None
+            if len(hist) < 50: return None
             info = stock.info
+            
             curr = hist['Close'].iloc[-1]
-            prev = hist['Close'].iloc[-2]
+            high_1y = hist['Close'].max()
+            low_1y = hist['Close'].min()
+            
+            # Fibonacci Levels
+            diff = high_1y - low_1y
+            fib_382 = high_1y - (diff * 0.382)
+            fib_618 = high_1y - (diff * 0.618)
+            
+            # Trend Analysis (HH/HL vs LH/LL proxy using Moving Averages)
+            sma20 = hist['Close'].rolling(20).mean().iloc[-1]
+            sma50 = hist['Close'].rolling(50).mean().iloc[-1]
             sma200 = hist['Close'].rolling(200).mean().iloc[-1] if len(hist) >= 200 else hist['Close'].mean()
-            h52 = info.get('fiftyTwoWeekHigh', hist['Close'].max())
+            
+            if sma20 > sma50 > sma200 and curr > sma20: trend = "Strong Uptrend (HH/HL)"
+            elif sma20 < sma50 < sma200 and curr < sma20: trend = "Strong Downtrend (LH/LL)"
+            elif curr > sma50: trend = "Moderate Uptrend"
+            else: trend = "Consolidation/Weak"
+            
+            # RSI
             delta = hist['Close'].diff()
             gain = delta.clip(lower=0).ewm(com=13, adjust=False).mean()
             loss = -delta.clip(upper=0).ewm(com=13, adjust=False).mean()
             rsi = (100 - (100 / (1 + (gain / loss)))).iloc[-1]
+            
             return t, {
                 'price': curr, 'sector': info.get('sector', 'Unknown'),
                 'pe': info.get('trailingPE', 0), 'beta': info.get('beta', 1.0),
-                'div': info.get('dividendYield', 0) or 0, 'h_drop': ((curr-h52)/h52)*100, 
-                'sma200': sma200, 'rsi': rsi, 'currency': "ILS" if str(t).endswith(".TA") else "USD"
+                'div': info.get('dividendYield', 0) or 0, 'h_drop': ((curr-high_1y)/high_1y)*100, 
+                'sma50': sma50, 'sma200': sma200, 'rsi': rsi,
+                'fib_382': fib_382, 'fib_618': fib_618, 'trend': trend,
+                'analyst': info.get('recommendationKey', 'none'), 'growth_yoy': info.get('revenueGrowth', 0) * 100,
+                'currency': "ILS" if str(t).endswith(".TA") else "USD"
             }
         except: return None
+        
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         results = executor.map(fetch_single, valid_list)
         for r in results:
@@ -121,24 +131,14 @@ def fetch_deep_data(tickers_to_fetch):
     return data
 
 usd_ils_rate = get_usd_ils()
-
 p_tickers = [t for t in st.session_state.portfolio.index if isinstance(t, str) and t.strip()]
-WATCHLIST = list(set(['META', 'NVDA', 'TSLA', 'AAPL', 'MSFT', 'MU', 'SPY', 'QQQ'] + p_tickers))
-WATCHLIST.sort()
 
 # ==========================================
-# 3. תפריט צדדי וניהול הגדרות
+# 3. Sidebar UI
 # ==========================================
-st.sidebar.header("⚙️ הגדרות תצוגה")
-# כפתור גלובלי שמחליף את כל האפליקציה למצב טלפון מפושט
-app_mode = st.sidebar.radio("מצב תצוגה:", ["💻 מחשב (מלא)", "📱 טלפון (פשוט וברור)"])
-is_mobile = app_mode == "📱 טלפון (פשוט וברור)"
-
-st.sidebar.divider()
 st.sidebar.header("💰 קופת מזומנים")
 n_usd = st.sidebar.number_input("מזומן בדולר $", value=float(st.session_state.config['cash_usd']))
 n_ils = st.sidebar.number_input("מזומן בשקל ₪", value=float(st.session_state.config['cash_ils']))
-
 if n_usd != st.session_state.config['cash_usd'] or n_ils != st.session_state.config['cash_ils']:
     st.session_state.config = {"cash_usd": n_usd, "cash_ils": n_ils}
     with open(CONFIG_FILE, 'w') as f: json.dump(st.session_state.config, f)
@@ -168,127 +168,149 @@ with st.sidebar.form("trade_form", clear_on_submit=True):
                 st.rerun()
 
 # ==========================================
-# 4. הטאבים המרכזיים
+# 4. Main Tabs
 # ==========================================
-t_port, t_scan, t_ai, t_advisor, t_journal = st.tabs(["💼 תיק השקעות", "🔎 סורק", "🤖 AI", "🧠 יועץ", "📜 יומן"])
+t_port, t_tech_port, t_timeframes, t_ideas, t_scan, t_journal = st.tabs([
+    "💼 התיק שלי", "📈 ניתוח טכני (התיק)", "⏱️ טווחי זמן", "🎯 רעיונות מסחר", "🌎 סורק S&P 500", "📜 יומן פעולות"
+])
 
-m_data = fetch_deep_data(WATCHLIST)
+# Fetch data only for portfolio to keep it fast, scan tab does its own thing
+m_data = fetch_expert_data(p_tickers + ['SPY', 'QQQ'])
 
+# --- TAB 1: PORTFOLIO & SECTOR ROTATION ---
 with t_port:
-    if not is_mobile:
-        with st.expander("⚙️ עריכה ידנית של התיק"):
-            edit_df = st.data_editor(st.session_state.portfolio.reset_index(), num_rows="dynamic", width='stretch')
-            if st.button("שמור שינויים"):
-                clean_df = edit_df.dropna(subset=['Ticker'])
-                clean_df = clean_df[clean_df['Ticker'].astype(str).str.strip() != ""]
-                st.session_state.portfolio = clean_df.set_index('Ticker')
-                save_cloud_portfolio(st.session_state.portfolio)
-                st.rerun()
-
-    stock_val_usd = 0; rows = []
+    st.subheader("סקירה כללית והמלצות מבנה (Sector Rotation)")
+    stock_val_usd = 0; rows = []; sector_weights = {}
     for t, row in st.session_state.portfolio.iterrows():
         if t in m_data and row['Quantity'] > 0:
             d = m_data[t]; qty = row['Quantity']; bp = row['PurchasePrice']
             v_u = (d['price']*qty / (usd_ils_rate if d['currency']=="ILS" else 1))
             stock_val_usd += v_u
+            sec = d['sector']
+            sector_weights[sec] = sector_weights.get(sec, 0) + v_u
             rows.append({
-                "Ticker": t, "Qty": qty, "Price": d['price'], "P&L %": ((d['price']-bp)/bp)*100, 
-                "Value USD": v_u, "Beta": d['beta'], "Div %": d['div']*100, "RSI": d['rsi'], 
-                "Curr": "₪" if d['currency']=="ILS" else "$", "Dist.High": d['h_drop']
+                "Ticker": t, "Sector": sec, "Qty": qty, "Price": d['price'],
+                "P&L %": ((d['price']-bp)/bp)*100, "Value USD": v_u, "Trend": d['trend']
             })
 
-    total_equity_usd = stock_val_usd + n_usd + (n_ils / usd_ils_rate)
-    total_equity_ils = total_equity_usd * usd_ils_rate
-
-    profit_usd = total_equity_usd - 7000
-    profit_ils = total_equity_ils - 25500
-    p_pct_usd = (profit_usd / 7000) * 100
-    p_pct_ils = (profit_ils / 25500) * 100
-
-    if not is_mobile:
-        st.markdown("### 📊 סיכום רווחים והפסדים")
-        c_p1, c_p2 = st.columns(2)
-        c_p1.metric("רווח/הפסד בדולר ($) מול 7,000$", f"${profit_usd:,.2f}", f"{p_pct_usd:.2f}%")
-        c_p2.metric("רווח/הפסד בשקל (₪) מול 25,500₪", f"₪{profit_ils:,.2f}", f"{p_pct_ils:.2f}%")
-        st.divider()
-        if rows:
-            st.dataframe(pd.DataFrame(rows).sort_values("Value USD", ascending=False).drop(columns="Value USD"), width='stretch')
-    else:
-        # תצוגה נקייה לטלפון
-        st.markdown("### 📱 סיכום מהיר")
-        st.info(f"רווח: ₪{profit_ils:,.0f} | דולר: ${profit_usd:,.0f}")
-        for r in sorted(rows, key=lambda x: x['Value USD'], reverse=True):
-            with st.container(border=True):
-                mc1, mc2 = st.columns([2,1])
-                mc1.markdown(f"#### {r['Ticker']}")
-                val_display = r['Value USD']*usd_ils_rate if r['Curr']=='₪' else r['Value USD']
-                mc1.caption(f"שווי: {r['Curr']}{val_display:,.0f}")
-                color = "green" if r['P&L %'] >= 0 else "red"
-                mc2.markdown(f"<h3 style='text-align:left;color:{color};'>{r['P&L %']:.1f}%</h3>", unsafe_allow_html=True)
-
-with t_advisor:
-    st.subheader("🧠 מורה נבוך להשקעות")
-    for r in rows:
-        with st.expander(f"{r['Ticker']}"):
-            col_ad1, col_ad2 = st.columns(2)
-            
-            rsi_val = r['RSI']
-            col_ad1.markdown(f"**RSI: {rsi_val:.1f}**")
-            if rsi_val > 70: col_ad1.error("🔥 חם מדי (Overbought)")
-            elif rsi_val < 30: col_ad1.success("✅ זול טכנית (Oversold)")
-            else: col_ad1.info("⚖️ נייטרלי")
-            if not is_mobile: col_ad1.caption("💡 נמוך מ-30 זה 'טוב' לקנייה. גבוה מ-70 מרמז על תיקון.")
-
-            beta_val = r['Beta']
-            col_ad2.markdown(f"**Beta: {beta_val:.2f}**")
-            if beta_val > 1.2: col_ad2.warning("⚡ תנודתי (מסוכן)")
-            elif beta_val < 0.8: col_ad2.success("🛡️ הגנתי (בטוח)")
-            else: col_ad2.write("📏 רגיל")
-            if not is_mobile: col_ad2.caption("💡 מעל 1.0 המניה תנודתית יותר מהשוק.")
-
-            st.divider()
-            pe = m_data[r['Ticker']]['pe']
-            st.write(f"**P/E (מכפיל רווח):** {pe:.1f} {'(זול 💎)' if 0 < pe < 15 else '(צמיחה 🚀)' if pe > 30 else ''}")
-            st.write(f"**דיבידנד:** {r['Div %']:.1f}%")
-
-with t_scan:
-    if st.button("🚀 הפעל סורק שוק חכם"):
-        with st.spinner("סורק נתונים..."):
-            all_ticks = get_global_tickers(); s_data = fetch_deep_data(all_ticks); df_s = pd.DataFrame(s_data).T
-            
-            if not is_mobile:
-                c_s1, c_s2 = st.columns(2)
-                c_s1.write("💰 מניות זולות (P/E < 15)"); c_s1.dataframe(df_s[(df_s['pe']>0)&(df_s['pe']<15)].sort_values('pe').head(15), width='stretch')
-                c_s2.write("🔥 מומנטום חזק"); c_s2.dataframe(df_s[(df_s['price']>df_s['sma200'])&(df_s['rsi']<55)].sort_values('rsi').head(15), width='stretch')
+    total_usd = stock_val_usd + n_usd + (n_ils / usd_ils_rate)
+    st.metric("שווי נכסים כולל", f"${total_usd:,.2f}")
+    
+    if rows:
+        st.dataframe(pd.DataFrame(rows).sort_values("Value USD", ascending=False).drop(columns="Value USD"), width='stretch')
+        
+        st.markdown("### 🔄 יועץ מבנה תיק (Sector Analysis)")
+        c_sec1, c_sec2 = st.columns(2)
+        with c_sec1:
+            st.write("**חשיפה סקטוריאלית נוכחית:**")
+            st.json({k: f"{(v/stock_val_usd)*100:.1f}%" for k,v in sector_weights.items()})
+        with c_sec2:
+            st.write("**המלצת היועץ:**")
+            if sector_weights.get('Technology', 0) / stock_val_usd > 0.5:
+                st.warning("⚠️ חשיפת יתר לטכנולוגיה. שקול להוסיף סקטורים דפנסיביים (Healthcare, Utilities) לאיזון במקרה של ירידות.")
             else:
-                st.write("💰 חברות ערך זולות:")
-                st.dataframe(df_s[(df_s['pe']>0)&(df_s['pe']<15)].sort_values('pe')[['price','pe']].head(5), width='stretch')
-                st.write("🔥 מומנטום:")
-                st.dataframe(df_s[(df_s['price']>df_s['sma200'])&(df_s['rsi']<55)].sort_values('rsi')[['price','rsi']].head(5), width='stretch')
+                st.success("✅ התיק מפוזר בצורה סבירה בין הסקטורים.")
 
-with t_ai:
-    a_ticker = st.text_input("סימול לחיזוי AI", value="NVDA").upper()
-    if st.button("צור תחזית 7 ימים 🔮"):
-        stock = yf.Ticker(a_ticker); df = stock.history(period="5y")
-        if len(df) > 250:
-            df['SMA10'] = df['Close'].rolling(10).mean(); df['SMA50'] = df['Close'].rolling(50).mean()
-            df['Vol'] = df['Close'].pct_change().rolling(20).std(); df['Mom'] = df['Close']/df['Close'].shift(10)-1
-            train = df.dropna(); y = train['Close'].shift(-7).dropna(); X = train.loc[y.index, ['SMA10', 'SMA50', 'Vol', 'Mom']]
-            model = RandomForestRegressor(n_estimators=100, random_state=42); model.fit(X, y)
-            preds = model.predict(df.tail(7)[['SMA10', 'SMA50', 'Vol', 'Mom']].bfill())
-            f_dates = [df.index[-1] + timedelta(days=i) for i in range(1, 8)]
-            fig = go.Figure(); fig.add_trace(go.Scatter(x=df.tail(60).index, y=df.tail(60)['Close'], name='Actual')); fig.add_trace(go.Scatter(x=f_dates, y=preds, name='AI Forecast', line=dict(dash='dash')))
-            st.plotly_chart(fig, use_container_width=True)
+# --- TAB 2: TECHNICAL ANALYSIS (PORTFOLIO) ---
+with t_tech_port:
+    st.subheader("ניתוח טכני ופונדמנטלי עמוק - מניות התיק")
+    for r in rows:
+        t = r['Ticker']
+        d = m_data[t]
+        with st.expander(f"📊 {t} - {d['trend']}"):
+            c1, c2, c3 = st.columns(3)
+            # Trends & Fibonacci
+            c1.markdown("**📈 ניתוח מגמה ופיבונאצ'י**")
+            c1.write(f"מגמה נוכחית: **{d['trend']}**")
+            c1.write(f"תמיכה קרובה (Fib 38.2%): **${d['fib_382']:.2f}**")
+            c1.write(f"תמיכה עמוקה (Fib 61.8%): **${d['fib_618']:.2f}**")
+            if d['price'] < d['fib_382'] and d['price'] > d['fib_618']:
+                c1.info("המניה נמצאת באזור קנייה קלאסי של פיבונאצ'י.")
+                
+            # Fundamentals & Analyst
+            c2.markdown("**🏢 פונדמנטלי ואנליסטים**")
+            c2.write(f"קונצנזוס אנליסטים (וול סטריט): **{d['analyst'].upper()}**")
+            c2.write(f"צמיחה בהכנסות YoY (שנה לשנה): **{d['growth_yoy']:.1f}%**")
+            pe = d['pe']
+            c2.write(f"מכפיל רווח P/E: **{pe:.1f}**")
+            if pe > 40: c2.warning("תמחור יקר ביחס לרווח.")
+            
+            # Oscillators
+            c3.markdown("**⏱️ מתנדים (Oscillators)**")
+            c3.write(f"RSI: **{d['rsi']:.1f}**")
+            if d['rsi'] > 70: c3.error("Overbought - סיכוי לירידה קרובה.")
+            elif d['rsi'] < 30: c3.success("Oversold - הזדמנות אפשרית.")
+            c3.write(f"מרחק משיא שנתי: **{d['h_drop']:.1f}%**")
 
+# --- TAB 3: TIMEFRAMES ---
+with t_timeframes:
+    st.subheader("⏱️ תחזיות וניתוח לטווחי זמן שונים")
+    st.info("תחזיות המבוססות על מומנטום היסטורי ותנודתיות (הערכות סטטיסטיות).")
+    
+    tf_tabs = st.tabs(["ימים (Swing)", "שבועות (Short-Term)", "חודשים (Mid-Term)", "שנים (Long-Term)"])
+    
+    for t in p_tickers:
+        if t not in m_data: continue
+        d = m_data[t]
+        p = d['price']
+        volatility = d['beta'] * 0.02 # Proxy for daily vol
+        
+        with tf_tabs[0]: # Days
+            est = p * (1 + (volatility if d['rsi'] < 50 else -volatility))
+            st.write(f"**{t} (ימים):** צפי למחיר ${est:.2f}. מגמה: {d['trend']}.")
+        with tf_tabs[1]: # Weeks
+            est = p * (1 + (volatility * 3))
+            st.write(f"**{t} (שבועות):** יעד התנגדות/תמיכה קרוב: ${est:.2f}.")
+        with tf_tabs[2]: # Months
+            est = p * (1 + (d['growth_yoy']/100 * 0.25)) # Growth based
+            st.write(f"**{t} (חודשים):** השפעת דוחות קרובים. יעד משוער ${est:.2f}.")
+        with tf_tabs[3]: # Years
+            est = p * (1 + (d['growth_yoy']/100))
+            st.write(f"**{t} (שנים):** חזון פונדמנטלי (צמיחה של {d['growth_yoy']:.1f}% לשנה). יעד: ${est:.2f}")
+
+# --- TAB 4: TRADE IDEAS ---
+with t_ideas:
+    st.subheader("🎯 רעיונות מסחר מהיועץ (Trade Ideas)")
+    c_sw, c_lt = st.columns(2)
+    
+    with c_sw:
+        st.markdown("### ⚡ עסקאות סווינג (ימים-שבועות)")
+        st.write("מניות שעברו תיקון חד אבל שומרות על מגמת עלייה, או מניות ב-Oversold:")
+        for t, d in m_data.items():
+            if d['rsi'] < 40 and "Uptrend" in d['trend']:
+                st.success(f"**{t}:** RSI נמוך ({d['rsi']:.1f}) במגמת עלייה. תמיכה ב-${d['fib_382']:.2f}")
+                
+    with c_lt:
+        st.markdown("### 🏦 השקעות לטווח ארוך (חודשים-שנים)")
+        st.write("חברות עם צמיחה חזקה, הכנסות יציבות, ומכפיל סביר:")
+        for t, d in m_data.items():
+            if d['growth_yoy'] > 15 and 0 < d['pe'] < 35 and "buy" in d['analyst']:
+                st.info(f"**{t}:** צמיחה של {d['growth_yoy']:.1f}%, המלצת {d['analyst'].upper()}, ומכפיל רווח סביר ({d['pe']:.1f}).")
+
+# --- TAB 5: S&P SCANNER ---
+with t_scan:
+    st.subheader("🌎 סורק שוק עולמי (S&P 500)")
+    if st.button("סרוק הזדמנויות בשוק"):
+        with st.spinner("שואב נתונים (עשוי לקחת מעט זמן)..."):
+            s_ticks = get_global_tickers()
+            # To prevent crashing, we scan a random sample of 50 stocks from S&P for speed
+            sample_ticks = random.sample(s_ticks, min(50, len(s_ticks))) 
+            s_data = fetch_expert_data(sample_ticks)
+            df_s = pd.DataFrame(s_data).T
+            
+            c_s1, c_s2 = st.columns(2)
+            c_s1.write("🔥 **מגמות עלייה חזקות (HH/HL)**")
+            up_df = df_s[df_s['trend'].astype(str).str.contains("Strong Up", na=False)]
+            c_s1.dataframe(up_df[['price', 'rsi', 'pe']], width='stretch')
+            
+            c_s2.write("📉 **נשחטו לאחרונה (RSI < 30)**")
+            os_df = df_s[df_s['rsi'] < 30]
+            c_s2.dataframe(os_df[['price', 'rsi', 'trend']], width='stretch')
+
+# --- TAB 6: JOURNAL ---
 with t_journal:
     st.subheader("📜 יומן פעולות")
     try:
         activity = conn.read(worksheet="Activity", ttl=0)
-        if not activity.empty: 
-            if not is_mobile:
-                st.dataframe(activity.sort_values("Date", ascending=False), width='stretch')
-            else:
-                for _, log in activity.sort_values("Date", ascending=False).head(10).iterrows():
-                    color = "green" if log['Action'] == "Buy" else "red"
-                    st.info(f"{log['Date'][:10]} | {log['Ticker']} | {log['Action']} {log['Quantity']} @ ${log['Price']:.2f}")
+        if not activity.empty: st.dataframe(activity.sort_values("Date", ascending=False), width='stretch')
     except: st.info("היומן ריק.")
