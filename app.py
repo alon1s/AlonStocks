@@ -39,13 +39,39 @@ st.markdown("""
     .main { background: #0a0e1a; }
     [data-testid="stSidebar"] { background: #0d1220; }
 
-    /* CRITICAL: prevent iOS double-tap zoom on inputs */
+    /* Prevent iOS double-tap zoom */
     input, select, textarea, button { font-size: 16px !important; }
 
-    /* Tighter main container padding on mobile */
     .main .block-container {
-        padding: 0.6rem 0.75rem 4rem !important;
+        padding: 0.6rem 0.75rem 110px !important;
         max-width: 100% !important;
+    }
+
+    /* ── RTL — Hebrew reads right-to-left ────── */
+    [data-testid="stMarkdown"] p,
+    [data-testid="stMarkdown"] li,
+    [data-testid="stMarkdown"] h1,
+    [data-testid="stMarkdown"] h2,
+    [data-testid="stMarkdown"] h3,
+    .stAlert p, .stSuccess p, .stWarning p, .stError p, .stInfo p,
+    [data-testid="stWidgetLabel"] p,
+    [data-testid="stMetric"] label,
+    [data-testid="stExpander"] summary p,
+    [data-testid="stExpander"] summary span,
+    [data-testid="stFormSubmitButton"] button,
+    .section-header, .stock-name {
+        direction: rtl !important;
+        text-align: right !important;
+        unicode-bidi: embed !important;
+    }
+    /* Keep numbers / charts / tables LTR */
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricDelta"],
+    .stDataFrame, .stDataEditor,
+    .js-plotly-plot, pre, code,
+    .stock-ticker, .stock-price {
+        direction: ltr !important;
+        text-align: left !important;
     }
 
     /* ── Metrics ─────────────────────────────── */
@@ -80,23 +106,6 @@ st.markdown("""
     }
     .stButton > button:active { transform: scale(0.97); }
 
-    /* ── Tabs ────────────────────────────────── */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2px !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important;
-        flex-wrap: nowrap !important;
-        padding-bottom: 2px;
-    }
-    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
-    .stTabs [data-baseweb="tab"] {
-        padding: 8px 10px !important;
-        font-size: 0.82rem !important;
-        white-space: nowrap !important;
-        min-width: 44px;
-    }
-
     /* ── DataFrames ──────────────────────────── */
     .stDataFrame { font-family: 'Space Mono', monospace !important; font-size: 0.75em; }
 
@@ -106,7 +115,7 @@ st.markdown("""
         border-radius: 10px; margin-bottom: 8px;
     }
 
-    /* ── Stock card (portfolio) ──────────────── */
+    /* ── Stock cards ─────────────────────────── */
     .stock-card {
         background: linear-gradient(135deg, #0f1729, #131c38);
         border: 1px solid #1e2d52;
@@ -116,25 +125,33 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         align-items: center;
-        cursor: pointer;
         -webkit-tap-highlight-color: transparent;
     }
     .stock-card:active { background: #1a2444; }
-    .stock-ticker  { font-size: 1.1rem; font-weight: 800; font-family: 'Space Mono', monospace; color: #fff; }
-    .stock-name    { font-size: 0.68rem; color: #7a8ab0; margin-top: 2px; }
+    .stock-ticker  { font-size: 1.15rem; font-weight: 800; font-family: 'Space Mono', monospace; color: #fff; }
+    .stock-name    { font-size: 0.7rem; color: #7a8ab0; margin-top: 3px; }
     .stock-price   { font-size: 1rem; font-weight: 700; font-family: 'Space Mono', monospace; color: #fff; }
-    .stock-pl      { font-size: 0.9rem; font-weight: 700; margin-top: 2px; }
-    .stock-signal  { font-size: 0.78rem; font-weight: 700; text-align: right; }
-    .stock-score   { font-size: 0.68rem; color: #7a8ab0; text-align: right; margin-top: 2px; }
+    .stock-pl      { font-size: 0.88rem; font-weight: 700; margin-top: 2px; }
+    .stock-signal  { font-size: 0.8rem; font-weight: 700; }
+    .stock-score   { font-size: 0.68rem; color: #7a8ab0; margin-top: 2px; }
+
+    /* ── Trade form card ─────────────────────── */
+    .trade-card {
+        background: linear-gradient(135deg, #0f1729, #1a2444);
+        border: 2px solid #2a3a6a;
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 14px;
+    }
 
     /* ── Market ticker strip ─────────────────── */
     .ticker-strip {
         background: linear-gradient(90deg, #0a0e1a, #0f1729, #0a0e1a);
         border: 1px solid #1e2d52; border-radius: 10px;
         padding: 10px 12px; margin-bottom: 10px;
-        display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+        display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
     }
-    .ticker-item { display: flex; flex-direction: column; align-items: center; min-width: 62px; }
+    .ticker-item { display: flex; flex-direction: column; align-items: center; min-width: 60px; }
     .ticker-name  { font-size: 0.6rem; color: #7a8ab0; font-family: 'Space Mono', monospace; }
     .ticker-price { font-size: 0.88rem; font-weight: 700; font-family: 'Space Mono', monospace; }
     .ticker-chg   { font-size: 0.7rem; font-family: 'Space Mono', monospace; }
@@ -152,31 +169,83 @@ st.markdown("""
         transform: translateX(-50%);
     }
 
-    /* ── Quick stat row ──────────────────────── */
-    .quick-stat {
-        background: #0f1729; border: 1px solid #1e2d52;
-        border-radius: 10px; padding: 10px;
-        text-align: center; margin: 4px 0;
-    }
-    .quick-stat-label { font-size: 0.65rem; color: #7a8ab0; text-transform: uppercase; }
-    .quick-stat-value { font-size: 1rem; font-weight: 700; font-family: 'Space Mono', monospace; }
-
     /* ── Section header ──────────────────────── */
     .section-header {
-        font-size: 0.7rem; font-weight: 700; color: #7a8ab0;
-        text-transform: uppercase; letter-spacing: 0.1em;
-        padding: 4px 0; margin: 12px 0 6px;
+        font-size: 0.72rem; font-weight: 700; color: #7a8ab0;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        padding: 4px 0; margin: 14px 0 8px;
         border-bottom: 1px solid #1e2d52;
     }
 
-    /* ── Mobile-specific overrides ───────────── */
+    /* ══════════════════════════════════════════
+       MOBILE BOTTOM NAVIGATION BAR
+       — tabs float at bottom like a native app
+       ══════════════════════════════════════════ */
+    @media (max-width: 900px) {
+        /* Fix the OUTER tab list to bottom of screen */
+        [data-testid="stTabs"] > div:first-child > div[data-baseweb="tab-list"] {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: auto !important;
+            z-index: 9999 !important;
+            background: #0d1220 !important;
+            border-top: 2px solid #2a3a6a !important;
+            border-bottom: none !important;
+            padding: 6px 4px env(safe-area-inset-bottom, 10px) !important;
+            margin: 0 !important;
+            display: flex !important;
+            justify-content: space-around !important;
+            box-shadow: 0 -6px 24px rgba(0,0,0,0.7) !important;
+            gap: 0 !important;
+            overflow-x: visible !important;
+        }
+        /* Each tab button */
+        [data-testid="stTabs"] > div:first-child div[data-baseweb="tab"] {
+            flex: 1 !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 4px 2px !important;
+            font-size: 0.65rem !important;
+            white-space: normal !important;
+            text-align: center !important;
+            line-height: 1.3 !important;
+            border-bottom: none !important;
+            min-width: 0 !important;
+        }
+        /* Active tab highlight */
+        [data-testid="stTabs"] > div:first-child div[aria-selected="true"][data-baseweb="tab"] {
+            color: #44aaff !important;
+            border-bottom: 2px solid #44aaff !important;
+        }
+        /* Inner sub-tabs: keep at top normally */
+        [data-testid="stTabs"] [data-testid="stTabs"] div[data-baseweb="tab-list"] {
+            position: static !important;
+            box-shadow: none !important;
+            border-top: none !important;
+            padding: 0 !important;
+            justify-content: flex-start !important;
+            overflow-x: auto !important;
+            gap: 2px !important;
+        }
+        /* Push content above the fixed nav */
+        [data-testid="stTabs"] > div > div[data-baseweb="tab-panel"] {
+            padding-bottom: 90px !important;
+        }
+        /* Smaller inner sub-tab buttons */
+        [data-testid="stTabs"] [data-testid="stTabs"] div[data-baseweb="tab"] {
+            flex-direction: row !important;
+            padding: 6px 10px !important;
+            font-size: 0.78rem !important;
+        }
+    }
+
+    /* Mobile misc */
     @media (max-width: 768px) {
-        .main .block-container { padding: 0.4rem 0.5rem 5rem !important; }
+        .main .block-container { padding: 0.4rem 0.5rem 110px !important; }
         [data-testid="stMetricValue"] { font-size: 1rem !important; }
-        .stTabs [data-baseweb="tab"] { padding: 7px 8px !important; font-size: 0.78rem !important; }
-        /* Forms: full width, spaced */
-        [data-testid="stForm"] { padding: 0 !important; }
-        .stSelectbox, .stTextInput, .stNumberInput { margin-bottom: 4px !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -833,13 +902,9 @@ if quick_ticker:
 m_data = fetch_expert_data(tuple(all_analyze))
 
 # ==========================================
-# TABS
+# TABS  (bottom nav on mobile via CSS)
 # ==========================================
-tabs = st.tabs([
-    "🌍 שוק", "💼 תיק", "📊 טכני", "🤖 AI",
-    "🔥 סורק", "⚖️ סיכון", "🎯 אסטרטגיות",
-    "📰 חדשות", "📜 יומן"
-])
+tabs = st.tabs(["🌍 שוק", "💼 תיק", "📊 טכני", "🤖 AI", "🔥 סורק", "⚖️ סיכון", "🎯 כלים", "📰 חדשות", "📜 יומן"])
 t_mkt, t_port, t_tech, t_ai, t_scan, t_risk, t_strat, t_news, t_journal = tabs
 
 # ==========================================
@@ -1010,34 +1075,41 @@ with t_port:
     r2c1.metric("💱 USD/ILS", f"₪{usd_ils_rate:.3f}")
     r2c2.metric("💸 דיב. שנתי", f"${total_div:.0f}")
 
-    # ── Quick Trade — exposed in main area for mobile ─────────────
-    with st.expander("⚡ ביצוע טרייד מהיר", expanded=False):
-        with st.form("quick_trade_main", clear_on_submit=True):
-            qc1, qc2 = st.columns(2)
-            qt_ticker = qc1.text_input("סימול").upper()
-            qt_action = qc2.selectbox("פעולה", ["Buy","Sell"])
-            qc3, qc4 = st.columns(2)
-            qt_qty    = qc3.number_input("כמות", min_value=0.0, step=0.1)
-            qt_price  = qc4.number_input("מחיר $", min_value=0.0, step=0.01)
-            if st.form_submit_button("✅ שלח עסקה", use_container_width=True):
-                if qt_ticker and qt_qty > 0:
-                    if qt_action == "Buy":
-                        if qt_ticker in st.session_state.portfolio.index:
-                            oq, op = st.session_state.portfolio.loc[qt_ticker, ['Quantity','PurchasePrice']]
-                            nq = oq + qt_qty
-                            st.session_state.portfolio.loc[qt_ticker] = [nq, ((oq*op)+(qt_qty*qt_price))/nq]
-                        else:
-                            st.session_state.portfolio.loc[qt_ticker] = [qt_qty, qt_price]
+    # ── Quick Trade — always visible, no expander ─────────────────
+    st.markdown('<div class="section-header">⚡ ביצוע עסקה</div>', unsafe_allow_html=True)
+    st.markdown('<div class="trade-card">', unsafe_allow_html=True)
+    with st.form("quick_trade_main", clear_on_submit=True):
+        qc1, qc2 = st.columns([3, 2])
+        qt_ticker = qc1.text_input("סימול מניה", placeholder="AAPL / TSLA / MSFT").upper()
+        qt_action = qc2.selectbox("פעולה", ["🟢 קנייה", "🔴 מכירה"])
+        qc3, qc4 = st.columns(2)
+        qt_qty   = qc3.number_input("כמות", min_value=0.0, step=0.1, value=1.0)
+        qt_price = qc4.number_input("מחיר $", min_value=0.0, step=0.01,
+                                     value=float(m_data.get(qt_ticker if qt_ticker else 'SPY', {}).get('price', 0)) if False else 0.0)
+        _is_buy = "קנייה" in qt_action
+        btn_label = f"✅ {'קנה' if _is_buy else 'מכור'} {qt_ticker or ''}"
+        if st.form_submit_button(btn_label, use_container_width=True):
+            _action_str = "Buy" if _is_buy else "Sell"
+            if qt_ticker and qt_qty > 0:
+                if _is_buy:
+                    if qt_ticker in st.session_state.portfolio.index:
+                        oq, op = st.session_state.portfolio.loc[qt_ticker, ['Quantity','PurchasePrice']]
+                        nq = oq + qt_qty
+                        st.session_state.portfolio.loc[qt_ticker] = [nq, ((oq*op)+(qt_qty*qt_price))/nq]
                     else:
-                        if qt_ticker in st.session_state.portfolio.index:
-                            nq = max(0, st.session_state.portfolio.loc[qt_ticker,'Quantity'] - qt_qty)
-                            if nq == 0:
-                                st.session_state.portfolio = st.session_state.portfolio.drop(qt_ticker)
-                            else:
-                                st.session_state.portfolio.loc[qt_ticker,'Quantity'] = nq
-                    if save_cloud_portfolio(st.session_state.portfolio):
-                        log_activity(qt_ticker, qt_action, qt_qty, qt_price)
-                        st.rerun()
+                        st.session_state.portfolio.loc[qt_ticker] = [qt_qty, qt_price]
+                else:
+                    if qt_ticker in st.session_state.portfolio.index:
+                        nq = max(0, st.session_state.portfolio.loc[qt_ticker,'Quantity'] - qt_qty)
+                        if nq == 0:
+                            st.session_state.portfolio = st.session_state.portfolio.drop(qt_ticker)
+                        else:
+                            st.session_state.portfolio.loc[qt_ticker,'Quantity'] = nq
+                if save_cloud_portfolio(st.session_state.portfolio):
+                    log_activity(qt_ticker, _action_str, qt_qty, qt_price)
+                    st.success(f"{'קנייה' if _is_buy else 'מכירה'} של {qt_ticker} בוצעה!")
+                    st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Stock cards — mobile-first view ──────────────────────────
     if rows:
@@ -1067,6 +1139,36 @@ with t_port:
                 f'</div>',
                 unsafe_allow_html=True
             )
+
+        # ── Edit / Delete Position ────────────────────────────────
+        st.markdown('<div class="section-header">✏️ עריכת פוזיציה</div>', unsafe_allow_html=True)
+        with st.expander("✏️ שינוי / מחיקת מניה מהתיק"):
+            edit_choices = [r['Ticker'] for r in rows]
+            if edit_choices:
+                ed_col1, ed_col2 = st.columns([2,1])
+                edit_sel = ed_col1.selectbox("בחר מניה לעריכה:", edit_choices, key='edit_sel')
+                _cur_row = st.session_state.portfolio.loc[edit_sel] if edit_sel in st.session_state.portfolio.index else None
+                _cur_qty   = float(_cur_row['Quantity'])   if _cur_row is not None else 0.0
+                _cur_price = float(_cur_row['PurchasePrice']) if _cur_row is not None else 0.0
+                with st.form("edit_position_form", clear_on_submit=False):
+                    ep1, ep2 = st.columns(2)
+                    new_qty   = ep1.number_input("כמות חדשה", min_value=0.0, step=0.1, value=_cur_qty)
+                    new_price = ep2.number_input("מחיר קנייה ממוצע $", min_value=0.0, step=0.01, value=_cur_price)
+                    upd, dlt = st.columns(2)
+                    if upd.form_submit_button("💾 עדכן", use_container_width=True):
+                        if new_qty > 0:
+                            st.session_state.portfolio.loc[edit_sel] = [new_qty, new_price]
+                        else:
+                            st.session_state.portfolio = st.session_state.portfolio.drop(edit_sel)
+                        if save_cloud_portfolio(st.session_state.portfolio):
+                            st.success(f"{edit_sel} עודכן!")
+                            st.rerun()
+                    if dlt.form_submit_button("🗑️ מחק לחלוטין", use_container_width=True):
+                        if edit_sel in st.session_state.portfolio.index:
+                            st.session_state.portfolio = st.session_state.portfolio.drop(edit_sel)
+                            if save_cloud_portfolio(st.session_state.portfolio):
+                                st.success(f"{edit_sel} נמחק מהתיק!")
+                                st.rerun()
 
         # ── Detailed table (collapsed) ─────────────────────────────
         df_rows = pd.DataFrame(rows)
@@ -1116,10 +1218,10 @@ with t_port:
         st.info("הוסף מניות לתיק דרך הסיידבר.")
 
 # ==========================================
-# TAB 3: DEEP TECHNICAL ANALYSIS
+# TAB 3: TECHNICAL ANALYSIS
 # ==========================================
 with t_tech:
-    st.subheader("📊 ניתוח טכני מעמיק - 25+ אינדיקטורים")
+    st.markdown('<div class="section-header">📊 ניתוח טכני — 25+ אינדיקטורים</div>', unsafe_allow_html=True)
 
     selectable = p_tickers + ([quick_ticker] if quick_ticker else [])
     analyze_ticker = st.selectbox("בחר מניה:", selectable) if selectable else None
@@ -1270,11 +1372,8 @@ with t_tech:
                     c_i1.dataframe(ind_df.iloc[:half], use_container_width=True, hide_index=True)
                     c_i2.dataframe(ind_df.iloc[half:], use_container_width=True, hide_index=True)
 
-# ==========================================
-# TAB 4: AI FORECAST
-# ==========================================
 with t_ai:
-    st.subheader("🤖 תחזית AI - Random Forest + Gradient Boosting Ensemble")
+    st.markdown('<div class="section-header">🤖 תחזית AI — Random Forest + Gradient Boosting</div>', unsafe_allow_html=True)
 
     selectable_ai = p_tickers + ([quick_ticker] if quick_ticker else [])
     if selectable_ai:
@@ -1339,10 +1438,10 @@ with t_ai:
             st.error("לא מספיק דאטה לאמן את המודל (נדרשות לפחות 252 נקודות / ~1 שנה).")
 
 # ==========================================
-# TAB 5: SCANNER
+# TAB 4: SCANNER
 # ==========================================
 with t_scan:
-    st.subheader("🔥 סורק הזדמנויות מתקדם")
+    st.markdown('<div class="section-header">🔥 סורק הזדמנויות</div>', unsafe_allow_html=True)
 
     sc1,sc2 = st.columns(2)
     with sc1:
@@ -1451,10 +1550,10 @@ with t_scan:
                     st.download_button("📥 ייצוא", tbl_df.to_csv(index=False), "scan.csv", "text/csv")
 
 # ==========================================
-# TAB 6: RISK ANALYSIS
+# TAB 6: עוד (Risk + Strategies + Journal)
 # ==========================================
 with t_risk:
-    st.subheader("⚖️ ניתוח סיכונים מתקדם")
+    st.markdown('<div class="section-header">⚖️ ניתוח סיכונים</div>', unsafe_allow_html=True)
 
     if p_tickers:
         with st.spinner("מחשב..."):
@@ -1532,12 +1631,7 @@ with t_risk:
     else:
         st.info("הוסף מניות לתיק.")
 
-# ==========================================
-# TAB 7: STRATEGIES
-# ==========================================
 with t_strat:
-    st.subheader("🎯 אסטרטגיות מסחר מתקדמות")
-
     strat_tabs = st.tabs(["📅 יעדי מחיר","🔄 DCA","📐 Position Sizing","⚖️ Kelly Criterion","🎓 מדריך"])
 
     with strat_tabs[0]:
@@ -1821,9 +1915,6 @@ with t_news:
         else:
             st.info("הרשימה ריקה. הוסף מניות למעקב.")
 
-# ==========================================
-# TAB 9: JOURNAL
-# ==========================================
 with t_journal:
     st.subheader("📜 יומן פעולות")
     try:
