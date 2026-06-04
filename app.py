@@ -34,66 +34,149 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
 
-    html, body, [class*="css"] { font-family: 'Syne', sans-serif; font-size: 16px; }
+    /* ── Base ────────────────────────────────── */
+    html, body, [class*="css"] { font-family: 'Syne', sans-serif; }
     .main { background: #0a0e1a; }
     [data-testid="stSidebar"] { background: #0d1220; }
 
-    .metric-card {
-        background: linear-gradient(135deg, #0f1729 0%, #1a2444 100%);
+    /* CRITICAL: prevent iOS double-tap zoom on inputs */
+    input, select, textarea, button { font-size: 16px !important; }
+
+    /* Tighter main container padding on mobile */
+    .main .block-container {
+        padding: 0.6rem 0.75rem 4rem !important;
+        max-width: 100% !important;
+    }
+
+    /* ── Metrics ─────────────────────────────── */
+    [data-testid="stMetric"] {
+        background: linear-gradient(135deg, #0f1729, #1a2444);
         border: 1px solid #2a3a6a;
         border-radius: 12px;
-        padding: 16px;
-        margin: 6px 0;
-        box-shadow: 0 4px 24px rgba(0,150,255,0.08);
+        padding: 10px 12px !important;
     }
-    .signal-buy  { color: #00ff88; font-weight: 700; }
-    .signal-sell { color: #ff4466; font-weight: 700; }
-    .signal-hold { color: #ffaa00; font-weight: 700; }
+    [data-testid="stMetric"] label {
+        font-size: 0.72rem !important;
+        color: #7a8ab0 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    [data-testid="stMetricValue"] {
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        font-family: 'Space Mono', monospace !important;
+    }
+    [data-testid="stMetricDelta"] { font-size: 0.78rem !important; }
 
-    .score-badge {
-        display: inline-block; padding: 4px 12px;
-        border-radius: 20px; font-family: 'Space Mono', monospace;
-        font-size: 0.85em; font-weight: 700;
+    /* ── Buttons ─────────────────────────────── */
+    .stButton > button {
+        min-height: 48px !important;
+        font-size: 1rem !important;
+        border-radius: 10px !important;
+        width: 100% !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.02em;
+        transition: transform 0.1s;
     }
-    .stDataFrame { font-family: 'Space Mono', monospace !important; font-size: 0.8em; }
+    .stButton > button:active { transform: scale(0.97); }
+
+    /* ── Tabs ────────────────────────────────── */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        flex-wrap: nowrap !important;
+        padding-bottom: 2px;
+    }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 10px !important;
+        font-size: 0.82rem !important;
+        white-space: nowrap !important;
+        min-width: 44px;
+    }
+
+    /* ── DataFrames ──────────────────────────── */
+    .stDataFrame { font-family: 'Space Mono', monospace !important; font-size: 0.75em; }
+
+    /* ── Expanders ───────────────────────────── */
     div[data-testid="stExpander"] {
         background: #0f1729; border: 1px solid #1e2d52;
         border-radius: 10px; margin-bottom: 8px;
     }
 
-    /* Market ticker strip */
-    .ticker-strip {
-        background: linear-gradient(90deg,#0a0e1a,#0f1729,#0a0e1a);
-        border: 1px solid #1e2d52; border-radius: 8px;
-        padding: 8px 16px; margin-bottom: 12px;
-        display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+    /* ── Stock card (portfolio) ──────────────── */
+    .stock-card {
+        background: linear-gradient(135deg, #0f1729, #131c38);
+        border: 1px solid #1e2d52;
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin: 6px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
     }
-    .ticker-item { display: flex; flex-direction: column; align-items: center; min-width: 70px; }
-    .ticker-name  { font-size: 0.65rem; color: #7a8ab0; font-family:'Space Mono',monospace; }
-    .ticker-price { font-size: 0.9rem; font-weight: 700; font-family:'Space Mono',monospace; }
-    .ticker-chg   { font-size: 0.72rem; font-family:'Space Mono',monospace; }
+    .stock-card:active { background: #1a2444; }
+    .stock-ticker  { font-size: 1.1rem; font-weight: 800; font-family: 'Space Mono', monospace; color: #fff; }
+    .stock-name    { font-size: 0.68rem; color: #7a8ab0; margin-top: 2px; }
+    .stock-price   { font-size: 1rem; font-weight: 700; font-family: 'Space Mono', monospace; color: #fff; }
+    .stock-pl      { font-size: 0.9rem; font-weight: 700; margin-top: 2px; }
+    .stock-signal  { font-size: 0.78rem; font-weight: 700; text-align: right; }
+    .stock-score   { font-size: 0.68rem; color: #7a8ab0; text-align: right; margin-top: 2px; }
 
-    /* Sentiment gauge */
+    /* ── Market ticker strip ─────────────────── */
+    .ticker-strip {
+        background: linear-gradient(90deg, #0a0e1a, #0f1729, #0a0e1a);
+        border: 1px solid #1e2d52; border-radius: 10px;
+        padding: 10px 12px; margin-bottom: 10px;
+        display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+    }
+    .ticker-item { display: flex; flex-direction: column; align-items: center; min-width: 62px; }
+    .ticker-name  { font-size: 0.6rem; color: #7a8ab0; font-family: 'Space Mono', monospace; }
+    .ticker-price { font-size: 0.88rem; font-weight: 700; font-family: 'Space Mono', monospace; }
+    .ticker-chg   { font-size: 0.7rem; font-family: 'Space Mono', monospace; }
+
+    /* ── Sentiment bar ───────────────────────── */
     .sentiment-bar {
         height: 10px; border-radius: 5px;
         background: linear-gradient(90deg,#ff2244,#ff8844,#ffaa00,#44ff88,#00ff88);
-        margin: 4px 0; position: relative;
+        margin: 6px 0 2px; position: relative;
     }
     .sentiment-marker {
-        position: absolute; top: -4px;
-        width: 18px; height: 18px; border-radius: 50%;
-        background: white; border: 2px solid #0a0e1a;
+        position: absolute; top: -5px;
+        width: 20px; height: 20px; border-radius: 50%;
+        background: white; border: 3px solid #0a0e1a;
         transform: translateX(-50%);
     }
 
-    /* Mobile responsive */
-    @media (max-width: 640px) {
-        .main { padding: 0.25rem !important; }
-        [data-testid="stMetric"] label { font-size: 0.7rem !important; }
+    /* ── Quick stat row ──────────────────────── */
+    .quick-stat {
+        background: #0f1729; border: 1px solid #1e2d52;
+        border-radius: 10px; padding: 10px;
+        text-align: center; margin: 4px 0;
+    }
+    .quick-stat-label { font-size: 0.65rem; color: #7a8ab0; text-transform: uppercase; }
+    .quick-stat-value { font-size: 1rem; font-weight: 700; font-family: 'Space Mono', monospace; }
+
+    /* ── Section header ──────────────────────── */
+    .section-header {
+        font-size: 0.7rem; font-weight: 700; color: #7a8ab0;
+        text-transform: uppercase; letter-spacing: 0.1em;
+        padding: 4px 0; margin: 12px 0 6px;
+        border-bottom: 1px solid #1e2d52;
+    }
+
+    /* ── Mobile-specific overrides ───────────── */
+    @media (max-width: 768px) {
+        .main .block-container { padding: 0.4rem 0.5rem 5rem !important; }
         [data-testid="stMetricValue"] { font-size: 1rem !important; }
-        .stButton > button { min-height: 44px !important; width: 100% !important; }
-        .ticker-strip { gap: 10px; }
-        .ticker-item  { min-width: 60px; }
+        .stTabs [data-baseweb="tab"] { padding: 7px 8px !important; font-size: 0.78rem !important; }
+        /* Forms: full width, spaced */
+        [data-testid="stForm"] { padding: 0 !important; }
+        .stSelectbox, .stTextInput, .stNumberInput { margin-bottom: 4px !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -763,116 +846,123 @@ t_mkt, t_port, t_tech, t_ai, t_scan, t_risk, t_strat, t_news, t_journal = tabs
 # TAB 1: MARKET OVERVIEW
 # ==========================================
 with t_mkt:
-    st.subheader("🌍 סקירת שוק - Market Overview")
-
-    # Ticker strip
+    # ── Ticker strip ──────────────────────────────────────────────
     strip_html = '<div class="ticker-strip">'
     for t, d in market_data.items():
         sign = "+" if d['change_pct'] >= 0 else ""
-        strip_html += f"""
-        <div class="ticker-item">
-            <span class="ticker-name">{d['name']}</span>
-            <span class="ticker-price" style="color:{d['color']}">${d['price']:,.2f}</span>
-            <span class="ticker-chg" style="color:{d['color']}">{sign}{d['change_pct']:.2f}%</span>
-        </div>"""
+        strip_html += (
+            f'<div class="ticker-item">'
+            f'<span class="ticker-name">{d["name"]}</span>'
+            f'<span class="ticker-price" style="color:{d["color"]}">${d["price"]:,.0f}</span>'
+            f'<span class="ticker-chg" style="color:{d["color"]}">{sign}{d["change_pct"]:.1f}%</span>'
+            f'</div>'
+        )
     strip_html += "</div>"
     st.markdown(strip_html, unsafe_allow_html=True)
 
-    # Sentiment
+    # ── Sentiment ─────────────────────────────────────────────────
     sent_score, sent_label, sent_color = compute_market_sentiment(market_data)
-    col_s1, col_s2 = st.columns([2,1])
-    with col_s1:
-        st.markdown(f"### Market Sentiment: <span style='color:{sent_color}'>{sent_label}</span>", unsafe_allow_html=True)
-        pct = sent_score / 100
-        st.markdown(f"""
-        <div class="sentiment-bar">
-            <div class="sentiment-marker" style="left:{pct*100}%"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#7a8ab0;">
-            <span>Extreme Fear</span><span>Fear</span><span>Neutral</span><span>Greed</span><span>Extreme Greed</span>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_s2:
-        st.metric("Sentiment Score", f"{sent_score}/100")
+    pct = sent_score / 100
+    st.markdown(
+        f'<div style="margin:4px 0 2px;font-size:0.82rem;font-weight:700;">'
+        f'שוק: <span style="color:{sent_color}">{sent_label}</span> ({sent_score}/100)'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f'<div class="sentiment-bar">'
+        f'<div class="sentiment-marker" style="left:{pct*100:.0f}%"></div>'
+        f'</div>'
+        f'<div style="display:flex;justify-content:space-between;font-size:0.6rem;color:#7a8ab0;margin-bottom:10px">'
+        f'<span>Fear</span><span>Neutral</span><span>Greed</span></div>',
+        unsafe_allow_html=True
+    )
+
+    # ── Indices grid — 2 columns ──────────────────────────────────
+    st.markdown('<div class="section-header">📈 מדדים עולמיים</div>', unsafe_allow_html=True)
+    mkt_items = list(market_data.items())
+    for i in range(0, len(mkt_items), 2):
+        cols = st.columns(2)
+        for j, col in enumerate(cols):
+            if i + j < len(mkt_items):
+                tick, d = mkt_items[i + j]
+                delta_str = f"{'+' if d['change_pct']>=0 else ''}{d['change_pct']:.2f}%"
+                col.metric(f"{d['arrow']} {d['name']}", f"${d['price']:,.2f}", delta_str)
 
     st.markdown("---")
 
-    # Indices grid
-    st.markdown("### 📈 Global Indices Performance")
-    mkt_cols = st.columns(4)
-    for i, (t, d) in enumerate(market_data.items()):
-        with mkt_cols[i % 4]:
-            delta_str = f"{'+' if d['change_pct']>=0 else ''}{d['change_pct']:.2f}%"
-            st.metric(
-                label=f"{d['arrow']} {d['name']}",
-                value=f"${d['price']:,.2f}",
-                delta=delta_str,
-                delta_color="normal"
-            )
-
-    st.markdown("---")
-
-    # Benchmark comparison chart
-    st.markdown("### 📊 1-Year Performance vs Benchmarks")
+    # ── Benchmark bar chart ───────────────────────────────────────
     bench_returns, bench_closes = get_benchmark_comparison(tuple(p_tickers[:8]))
     if bench_returns:
+        st.markdown('<div class="section-header">📊 ביצועים 1Y מול SPY</div>', unsafe_allow_html=True)
         tickers_for_chart = [t for t in list(p_tickers[:8]) + ['SPY','QQQ'] if t in bench_returns]
-        perf_vals = [bench_returns[t] for t in tickers_for_chart]
-        colors_perf = ['#00ff88' if v >= 0 else '#ff4466' for v in perf_vals]
-        fig_bench = go.Figure(go.Bar(
+        perf_vals  = [bench_returns[t] for t in tickers_for_chart]
+        fig_bench  = go.Figure(go.Bar(
             x=tickers_for_chart, y=perf_vals,
-            marker_color=colors_perf,
-            text=[f"{v:.1f}%" for v in perf_vals],
-            textposition='auto'
+            marker_color=['#00ff88' if v >= 0 else '#ff4466' for v in perf_vals],
+            text=[f"{v:.1f}%" for v in perf_vals], textposition='auto'
         ))
         fig_bench.update_layout(
-            title="1Y Return vs Benchmarks",
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            font_color='white', height=350,
-            yaxis_title="Return (%)"
+            font_color='white', height=280, margin=dict(l=10,r=10,t=10,b=30)
         )
-        st.plotly_chart(fig_bench, use_container_width=True)
+        st.plotly_chart(fig_bench, use_container_width=True,
+                        config={"displayModeBar": False})
 
-    # Portfolio vs SPY line chart
+    # ── Normalized line chart ─────────────────────────────────────
     if p_tickers and not bench_closes.empty:
-        st.markdown("### 📈 Portfolio vs SPY - Normalized")
+        st.markdown('<div class="section-header">📈 תיק vs SPY — מנורמל</div>', unsafe_allow_html=True)
         fig_vs = go.Figure()
-        for t in p_tickers[:6]:
+        for t in p_tickers[:5]:
             if t in bench_closes.columns:
-                series = bench_closes[t].dropna()
-                if len(series) > 1:
-                    norm = series / series.iloc[0] * 100
-                    fig_vs.add_trace(go.Scatter(x=norm.index, y=norm.values, name=t, mode='lines'))
+                s = bench_closes[t].dropna()
+                if len(s) > 1:
+                    n = s / s.iloc[0] * 100
+                    fig_vs.add_trace(go.Scatter(x=n.index, y=n.values, name=t, mode='lines', line=dict(width=1.5)))
         if 'SPY' in bench_closes.columns:
-            spy_s = bench_closes['SPY'].dropna()
-            spy_n = spy_s / spy_s.iloc[0] * 100
-            fig_vs.add_trace(go.Scatter(x=spy_n.index, y=spy_n.values, name='SPY (Benchmark)',
+            sp = bench_closes['SPY'].dropna()
+            sn = sp / sp.iloc[0] * 100
+            fig_vs.add_trace(go.Scatter(x=sn.index, y=sn.values, name='SPY',
                                         line=dict(dash='dash', color='#ffaa00', width=2)))
         fig_vs.update_layout(
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            font_color='white', height=400,
-            yaxis_title="Normalized (base=100)", hovermode='x unified'
+            font_color='white', height=300, margin=dict(l=10,r=10,t=10,b=30),
+            legend=dict(orientation='h', y=-0.15, font=dict(size=10)),
+            hovermode='x unified'
         )
-        st.plotly_chart(fig_vs, use_container_width=True)
+        st.plotly_chart(fig_vs, use_container_width=True, config={"displayModeBar": False})
 
-    # Top movers from portfolio + watchlist
-    st.markdown("### 🏆 Top Movers (Portfolio)")
-    mover_rows = []
-    for t in p_tickers:
-        d = m_data.get(t)
-        if d:
-            mover_rows.append({'Ticker': t, '1M%': round(d.get('mom_1m',0),1),
-                                'Signal': d.get('signal',''), 'Score': d.get('score',50)})
-    if mover_rows:
-        mr_df = pd.DataFrame(mover_rows).sort_values('1M%', ascending=False)
-        st.dataframe(mr_df, use_container_width=True, hide_index=True)
+    # ── Top movers list ───────────────────────────────────────────
+    if p_tickers:
+        st.markdown('<div class="section-header">🏆 מניות מהתיק</div>', unsafe_allow_html=True)
+        movers = sorted(
+            [(t, m_data[t]) for t in p_tickers if t in m_data],
+            key=lambda x: x[1].get('mom_1m', 0), reverse=True
+        )
+        for t, d in movers:
+            m1  = d.get('mom_1m', 0)
+            clr = '#00ff88' if m1 >= 0 else '#ff4466'
+            sig = d.get('signal','')
+            sig_clr = {'STRONG BUY':'#00ff88','BUY':'#44dd88','WATCH':'#44aaff',
+                       'HOLD':'#ffaa00','SELL':'#ff6688','STRONG SELL':'#ff2244'}.get(sig,'#ffaa00')
+            st.markdown(
+                f'<div class="stock-card">'
+                f'<div><div class="stock-ticker">{t}</div>'
+                f'<div class="stock-name">{d.get("sector","")[:18]}</div></div>'
+                f'<div style="text-align:center">'
+                f'<div class="stock-price">${d["price"]:,.2f}</div>'
+                f'<div class="stock-pl" style="color:{clr}">{"+"+str(round(m1,1)) if m1>=0 else round(m1,1)}% 1M</div></div>'
+                f'<div><div class="stock-signal" style="color:{sig_clr}">{sig}</div>'
+                f'<div class="stock-score">Score {d.get("score",50)}</div></div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
 
 # ==========================================
 # TAB 2: PORTFOLIO
 # ==========================================
 with t_port:
-    st.subheader("💼 תיק השקעות - סקירה מקיפה")
-
+    # ── Build portfolio data ───────────────────────────────────────
     stock_val_usd = 0; rows = []; sector_weights = {}; cost_basis = 0
 
     for t, row in st.session_state.portfolio.iterrows():
@@ -903,46 +993,100 @@ with t_port:
                 "Analyst": d.get('analyst','none'),
             })
 
-    total_usd  = stock_val_usd + n_usd + (n_ils / usd_ils_rate)
-    total_ils  = total_usd * usd_ils_rate
-    init_inv   = st.session_state.config.get('initial_investment', 7000)
-    profit_usd = total_usd - init_inv
-    profit_ils = total_ils - (init_inv * usd_ils_rate)
-    total_div  = sum(r['Annual Div $'] for r in rows)
-    total_return_pct = (total_usd - init_inv) / init_inv * 100 if init_inv > 0 else 0
+    total_usd        = stock_val_usd + n_usd + (n_ils / usd_ils_rate)
+    total_ils        = total_usd * usd_ils_rate
+    init_inv         = st.session_state.config.get('initial_investment', 7000)
+    profit_usd       = total_usd - init_inv
+    total_div        = sum(r['Annual Div $'] for r in rows)
+    total_return_pct = (profit_usd / init_inv * 100) if init_inv > 0 else 0
 
-    col1,col2,col3,col4,col5 = st.columns(5)
-    col1.metric("💵 שווי כולל", f"${total_usd:,.2f}")
-    col2.metric("📈 רווח/הפסד", f"${profit_usd:,.2f}", f"{total_return_pct:.1f}%")
-    col3.metric("₪ שווי", f"₪{total_ils:,.0f}")
-    col4.metric("💱 USD/ILS", f"₪{usd_ils_rate:.3f}")
-    col5.metric("💸 דיב. שנתי", f"${total_div:.2f}")
+    # ── Summary metrics — 2×2 grid ────────────────────────────────
+    r1c1, r1c2 = st.columns(2)
+    r1c1.metric("💵 שווי כולל", f"${total_usd:,.0f}",
+                f"{'+'if profit_usd>=0 else ''}{profit_usd:,.0f}")
+    r1c2.metric("📈 תשואה", f"{total_return_pct:.1f}%",
+                f"{'+'if profit_usd>=0 else ''}${profit_usd:,.0f}")
+    r2c1, r2c2 = st.columns(2)
+    r2c1.metric("💱 USD/ILS", f"₪{usd_ils_rate:.3f}")
+    r2c2.metric("💸 דיב. שנתי", f"${total_div:.0f}")
 
+    # ── Quick Trade — exposed in main area for mobile ─────────────
+    with st.expander("⚡ ביצוע טרייד מהיר", expanded=False):
+        with st.form("quick_trade_main", clear_on_submit=True):
+            qc1, qc2 = st.columns(2)
+            qt_ticker = qc1.text_input("סימול").upper()
+            qt_action = qc2.selectbox("פעולה", ["Buy","Sell"])
+            qc3, qc4 = st.columns(2)
+            qt_qty    = qc3.number_input("כמות", min_value=0.0, step=0.1)
+            qt_price  = qc4.number_input("מחיר $", min_value=0.0, step=0.01)
+            if st.form_submit_button("✅ שלח עסקה", use_container_width=True):
+                if qt_ticker and qt_qty > 0:
+                    if qt_action == "Buy":
+                        if qt_ticker in st.session_state.portfolio.index:
+                            oq, op = st.session_state.portfolio.loc[qt_ticker, ['Quantity','PurchasePrice']]
+                            nq = oq + qt_qty
+                            st.session_state.portfolio.loc[qt_ticker] = [nq, ((oq*op)+(qt_qty*qt_price))/nq]
+                        else:
+                            st.session_state.portfolio.loc[qt_ticker] = [qt_qty, qt_price]
+                    else:
+                        if qt_ticker in st.session_state.portfolio.index:
+                            nq = max(0, st.session_state.portfolio.loc[qt_ticker,'Quantity'] - qt_qty)
+                            if nq == 0:
+                                st.session_state.portfolio = st.session_state.portfolio.drop(qt_ticker)
+                            else:
+                                st.session_state.portfolio.loc[qt_ticker,'Quantity'] = nq
+                    if save_cloud_portfolio(st.session_state.portfolio):
+                        log_activity(qt_ticker, qt_action, qt_qty, qt_price)
+                        st.rerun()
+
+    # ── Stock cards — mobile-first view ──────────────────────────
     if rows:
+        st.markdown('<div class="section-header">מניות בתיק</div>', unsafe_allow_html=True)
+        sig_colors = {
+            'STRONG BUY':'#00ff88','BUY':'#44dd88','WATCH':'#44aaff',
+            'HOLD':'#ffaa00','AVOID':'#ff8844','SELL':'#ff6688','STRONG SELL':'#ff2244'
+        }
+        for r in sorted(rows, key=lambda x: x['P&L %'], reverse=True):
+            pl_clr  = '#00ff88' if r['P&L %'] >= 0 else '#ff4466'
+            s_clr   = sig_colors.get(r['Signal'], '#ffaa00')
+            pl_sign = '+' if r['P&L %'] >= 0 else ''
+            st.markdown(
+                f'<div class="stock-card">'
+                f'  <div>'
+                f'    <div class="stock-ticker">{r["Ticker"]}</div>'
+                f'    <div class="stock-name">{r["Sector"][:16]}</div>'
+                f'  </div>'
+                f'  <div style="text-align:center">'
+                f'    <div class="stock-price">${r["Price"]:,.2f}</div>'
+                f'    <div class="stock-pl" style="color:{pl_clr}">{pl_sign}{r["P&L %"]:.1f}%&nbsp;&nbsp;${r["P&L $"]:+,.0f}</div>'
+                f'  </div>'
+                f'  <div style="text-align:right">'
+                f'    <div class="stock-signal" style="color:{s_clr}">{r["Signal"]}</div>'
+                f'    <div class="stock-score">RSI {r["RSI"]} · {r["Score"]}/100</div>'
+                f'  </div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+        # ── Detailed table (collapsed) ─────────────────────────────
         df_rows = pd.DataFrame(rows)
-
-        def color_signal(val):
-            colors = {'STRONG BUY':'color:#00ff88;font-weight:bold',
-                      'BUY':'color:#44dd88','HOLD':'color:#ffaa00',
-                      'WATCH':'color:#44aaff','SELL':'color:#ff6688',
-                      'STRONG SELL':'color:#ff2244;font-weight:bold'}
-            return colors.get(val,'')
-
-        def color_pl(val):
-            try: return 'color:#00ff88' if float(val)>=0 else 'color:#ff4466'
-            except: return ''
-
-        styled = df_rows.style\
-            .map(color_signal, subset=['Signal'])\
-            .map(color_pl, subset=['P&L %','P&L $','Upside %'])\
-            .format({'Price':'${:.2f}','Buy@':'${:.2f}','Value $':'${:,.2f}',
-                     'P&L %':'{:.2f}%','P&L $':'${:,.2f}','Annual Div $':'${:.2f}',
-                     'Target $':'${:.2f}','Upside %':'{:.1f}%'})
-        st.dataframe(styled, use_container_width=True)
-
-        # Export
-        csv = df_rows.to_csv(index=False)
-        st.download_button("📥 ייצוא לCSV", csv, "portfolio.csv", "text/csv")
+        with st.expander("📋 טבלה מלאה"):
+            def color_signal(val):
+                return {'STRONG BUY':'color:#00ff88;font-weight:bold','BUY':'color:#44dd88',
+                        'HOLD':'color:#ffaa00','WATCH':'color:#44aaff',
+                        'SELL':'color:#ff6688','STRONG SELL':'color:#ff2244;font-weight:bold'}.get(val,'')
+            def color_pl(val):
+                try: return 'color:#00ff88' if float(val)>=0 else 'color:#ff4466'
+                except: return ''
+            styled = df_rows.style\
+                .map(color_signal, subset=['Signal'])\
+                .map(color_pl, subset=['P&L %','P&L $','Upside %'])\
+                .format({'Price':'${:.2f}','Buy@':'${:.2f}','Value $':'${:,.2f}',
+                         'P&L %':'{:.2f}%','P&L $':'${:,.2f}','Annual Div $':'${:.2f}',
+                         'Target $':'${:.2f}','Upside %':'{:.1f}%'})
+            st.dataframe(styled, use_container_width=True)
+            csv = df_rows.to_csv(index=False)
+            st.download_button("📥 ייצוא CSV", csv, "portfolio.csv", "text/csv")
 
         col_p1,col_p2 = st.columns(2)
         with col_p1:
@@ -951,8 +1095,10 @@ with t_port:
                                  names=list(sector_weights.keys()),
                                  title="פיזור סקטוריאלי",
                                  color_discrete_sequence=px.colors.sequential.Plasma)
-                fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
-                st.plotly_chart(fig_pie, use_container_width=True)
+                fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
+                                      height=280, margin=dict(l=0,r=0,t=30,b=0),
+                                      legend=dict(font=dict(size=9)))
+                st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar":False})
         with col_p2:
             fig_score = go.Figure(go.Bar(
                 x=[r['Ticker'] for r in rows],
@@ -962,22 +1108,9 @@ with t_port:
                 text=[r['Signal'] for r in rows], textposition='auto'
             ))
             fig_score.update_layout(title="Quant Score", paper_bgcolor='rgba(0,0,0,0)',
-                                    font_color='white', yaxis_range=[0,100])
-            st.plotly_chart(fig_score, use_container_width=True)
-
-        # P&L waterfall
-        fig_pl = go.Figure(go.Waterfall(
-            x=[r['Ticker'] for r in rows],
-            y=[r['P&L $']  for r in rows],
-            measure=['relative']*len(rows),
-            text=[f"${r['P&L $']:+,.0f}" for r in rows],
-            connector_line_color='#2a3a6a',
-            increasing_marker_color='#00ff88',
-            decreasing_marker_color='#ff4466',
-        ))
-        fig_pl.update_layout(title="P&L per Position", paper_bgcolor='rgba(0,0,0,0)',
-                             font_color='white', height=300)
-        st.plotly_chart(fig_pl, use_container_width=True)
+                                    font_color='white', yaxis_range=[0,100],
+                                    height=280, margin=dict(l=10,r=10,t=30,b=10))
+            st.plotly_chart(fig_score, use_container_width=True, config={"displayModeBar":False})
 
     else:
         st.info("הוסף מניות לתיק דרך הסיידבר.")
@@ -1004,12 +1137,15 @@ with t_tech:
         if not hist.empty:
             d = m_data.get(analyze_ticker, {})
 
-            c1,c2,c3,c4,c5,c6 = st.columns(6)
+            # 3-col top metrics (readable on phone)
+            c1,c2,c3 = st.columns(3)
             c1.metric("מחיר", f"${d.get('price', hist['Close'].iloc[-1]):,.2f}")
-            c2.metric("RSI", f"{d.get('rsi',50):.1f}",
-                      "🔴 OB" if d.get('rsi',50)>70 else "🟢 OS" if d.get('rsi',50)<30 else "Neutral")
-            c3.metric("Score", f"{d.get('score',50)}/100")
-            c4.metric("Signal", d.get('signal','N/A'))
+            rsi_v = d.get('rsi',50)
+            c2.metric("RSI", f"{rsi_v:.0f}",
+                      "OB🔴" if rsi_v>70 else "OS🟢" if rsi_v<30 else "Neutral")
+            c3.metric("Signal", d.get('signal','N/A'))
+            c4,c5,c6 = st.columns(3)
+            c4.metric("Score", f"{d.get('score',50)}/100")
             c5.metric("Target", f"${d.get('target_price',0):,.2f}", f"{d.get('target_upside',0):.1f}%")
             c6.metric("Beta", f"{d.get('beta',1):.2f}")
 
@@ -1077,63 +1213,62 @@ with t_tech:
             fig.add_trace(go.Bar(x=hist.index, y=hist['Volume'], name='Volume',
                                  marker_color='rgba(100,150,255,0.4)'), row=4,col=1)
 
-            fig.update_layout(height=900, paper_bgcolor='#0a0e1a', plot_bgcolor='#0f1729',
-                              font_color='white', xaxis_rangeslider_visible=False,
-                              legend=dict(orientation='h',y=1.02))
-            st.plotly_chart(fig, use_container_width=True)
+            fig.update_layout(
+                height=650, paper_bgcolor='#0a0e1a', plot_bgcolor='#0f1729',
+                font_color='white', xaxis_rangeslider_visible=False,
+                margin=dict(l=10,r=10,t=30,b=10),
+                legend=dict(orientation='h', y=1.02, font=dict(size=9))
+            )
+            st.plotly_chart(fig, use_container_width=True,
+                            config={"displayModeBar": False, "scrollZoom": True})
 
-            # Indicators table
-            st.markdown("### 📋 טבלת אינדיקטורים מלאה")
+            # Score reasons — shown above the fold on mobile
             if d:
-                ind_data = {
-                    "📈 מגמה": d.get('trend','-'),
-                    "RSI (14)": f"{d.get('rsi',0):.1f}",
-                    "MACD": f"{d.get('macd',0):.3f}",
-                    "MACD Signal": f"{d.get('macd_signal',0):.3f}",
-                    "MACD Crossover": "✅ YES" if d.get('macd_crossover') else "❌ No",
-                    "Stoch %K": f"{d.get('stoch_k',0):.1f}",
-                    "Stoch %D": f"{d.get('stoch_d',0):.1f}",
-                    "BB %": f"{d.get('bb_pct',0)*100:.1f}%",
-                    "BB Width": f"{d.get('bb_width',0):.3f}",
-                    "ATR %": f"{d.get('atr_pct',0):.2f}%",
-                    "Vol Ratio": f"{d.get('vol_ratio',1):.2f}x",
-                    "OBV Trend": "▲ Bullish" if d.get('obv_trend',0)==1 else "▼ Bearish",
-                    "Support": f"${d.get('support',0):.2f}",
-                    "Resistance": f"${d.get('resistance',0):.2f}",
-                    "Momentum 1M": f"{d.get('mom_1m',0):.1f}%",
-                    "Momentum 3M": f"{d.get('mom_3m',0):.1f}%",
-                    "Momentum 6M": f"{d.get('mom_6m',0):.1f}%",
-                    "P/E": f"{d.get('pe',0):.1f}",
-                    "Forward P/E": f"{d.get('forward_pe',0):.1f}",
-                    "PEG": f"{d.get('peg',0):.2f}",
-                    "P/S": f"{d.get('ps',0):.2f}",
-                    "P/B": f"{d.get('pb',0):.2f}",
-                    "ROE": f"{d.get('roe',0):.1f}%",
-                    "Gross Margin": f"{d.get('gross_margin',0):.1f}%",
-                    "Profit Margin": f"{d.get('profit_margin',0):.1f}%",
-                    "Revenue Growth": f"{d.get('growth_yoy',0):.1f}%",
-                    "Debt/Equity": f"{d.get('debt_to_equity',0):.2f}",
-                    "Short %": f"{d.get('short_pct',0):.1f}%",
-                    "Inst. Own %": f"{d.get('inst_own',0):.1f}%",
-                    "Analyst Target": f"${d.get('target_price',0):.2f}",
-                    "Target Low": f"${d.get('target_low',0):.2f}",
-                    "Target High": f"${d.get('target_high',0):.2f}",
-                    "# Analysts": f"{d.get('num_analysts',0):.0f}",
-                    "Upside": f"{d.get('target_upside',0):.1f}%",
-                    "Dividend Yield": f"{d.get('div',0):.2f}%",
-                }
-                ind_df = pd.DataFrame(list(ind_data.items()), columns=['Indicator','Value'])
-                c_i1, c_i2 = st.columns(2)
-                half = len(ind_df)//2
-                c_i1.dataframe(ind_df.iloc[:half], use_container_width=True, hide_index=True)
-                c_i2.dataframe(ind_df.iloc[half:], use_container_width=True, hide_index=True)
+                st.markdown(
+                    f'<div class="section-header">🧠 ניתוח Score {d.get("score",0)}/100 · {d.get("trend","-")}</div>',
+                    unsafe_allow_html=True
+                )
+                for reason in d.get('reasons',[]):
+                    if "✅" in reason: st.success(reason)
+                    elif "⚠️" in reason or "🚨" in reason: st.warning(reason)
 
-            # Score reasons
-            st.markdown(f"### 🧠 ניתוח - Score={d.get('score',0)}/100")
-            for reason in d.get('reasons',[]):
-                if "✅" in reason: st.success(reason)
-                elif "⚠️" in reason or "🚨" in reason: st.warning(reason)
-                else: st.info(reason)
+            # Indicators table in expander
+            with st.expander("📋 כל האינדיקטורים"):
+                if d:
+                    ind_data = {
+                        "מגמה": d.get('trend','-'),
+                        "RSI": f"{d.get('rsi',0):.1f}",
+                        "MACD Cross": "✅" if d.get('macd_crossover') else "❌",
+                        "Stoch %K": f"{d.get('stoch_k',0):.1f}",
+                        "BB %": f"{d.get('bb_pct',0)*100:.1f}%",
+                        "ATR %": f"{d.get('atr_pct',0):.2f}%",
+                        "Vol Ratio": f"{d.get('vol_ratio',1):.2f}x",
+                        "OBV": "▲" if d.get('obv_trend',0)==1 else "▼",
+                        "Support": f"${d.get('support',0):.2f}",
+                        "Resistance": f"${d.get('resistance',0):.2f}",
+                        "Mom 1M": f"{d.get('mom_1m',0):.1f}%",
+                        "Mom 3M": f"{d.get('mom_3m',0):.1f}%",
+                        "Mom 6M": f"{d.get('mom_6m',0):.1f}%",
+                        "P/E": f"{d.get('pe',0):.1f}",
+                        "Fwd P/E": f"{d.get('forward_pe',0):.1f}",
+                        "PEG": f"{d.get('peg',0):.2f}",
+                        "P/B": f"{d.get('pb',0):.2f}",
+                        "ROE": f"{d.get('roe',0):.1f}%",
+                        "Gross Margin": f"{d.get('gross_margin',0):.1f}%",
+                        "Net Margin": f"{d.get('profit_margin',0):.1f}%",
+                        "Rev Growth": f"{d.get('growth_yoy',0):.1f}%",
+                        "Debt/Eq": f"{d.get('debt_to_equity',0):.2f}",
+                        "Short %": f"{d.get('short_pct',0):.1f}%",
+                        "Inst %": f"{d.get('inst_own',0):.1f}%",
+                        "Target": f"${d.get('target_price',0):.2f}",
+                        "Upside": f"{d.get('target_upside',0):.1f}%",
+                        "Div Yield": f"{d.get('div',0):.2f}%",
+                    }
+                    ind_df = pd.DataFrame(list(ind_data.items()), columns=['Indicator','Value'])
+                    c_i1, c_i2 = st.columns(2)
+                    half = len(ind_df)//2
+                    c_i1.dataframe(ind_df.iloc[:half], use_container_width=True, hide_index=True)
+                    c_i2.dataframe(ind_df.iloc[half:], use_container_width=True, hide_index=True)
 
 # ==========================================
 # TAB 4: AI FORECAST
@@ -1154,10 +1289,11 @@ with t_ai:
             pred, details = ml_forecast(forecast_ticker, forecast_days)
 
         if details:
-            c1,c2,c3,c4 = st.columns(4)
+            c1,c2 = st.columns(2)
             c1.metric("מחיר נוכחי", f"${details['current']:,.2f}")
             c2.metric(f"תחזית {forecast_days}d", f"${details['predicted']:,.2f}",
                       f"{details['pct_change']:.1f}%")
+            c3,c4 = st.columns(2)
             direction = "📈 עלייה" if details['pct_change']>0 else "📉 ירידה"
             c3.metric("כיוון", direction)
             c4.metric("Confidence", f"{details['confidence']:.0f}%")
@@ -1185,17 +1321,18 @@ with t_ai:
                 line=dict(color='rgba(0,0,0,0)'), name='Confidence Band'
             ))
             fig_pred.update_layout(title=f"{forecast_ticker} Price Forecast",
-                                   paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=350)
-            st.plotly_chart(fig_pred, use_container_width=True)
+                                   paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=280,
+                                   margin=dict(l=10,r=10,t=30,b=10))
+            st.plotly_chart(fig_pred, use_container_width=True, config={"displayModeBar":False})
 
-            # Feature importance
-            imp_df = pd.DataFrame(list(details['importance'].items()),
-                                  columns=['Feature','Importance']).sort_values('Importance', ascending=True)
-            fig_imp = go.Figure(go.Bar(x=imp_df['Importance'], y=imp_df['Feature'],
-                                       orientation='h', marker_color='#44aaff'))
-            fig_imp.update_layout(title="Feature Importance",
-                                  paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=400)
-            st.plotly_chart(fig_imp, use_container_width=True)
+            with st.expander("📊 Feature Importance"):
+                imp_df = pd.DataFrame(list(details['importance'].items()),
+                                      columns=['Feature','Importance']).sort_values('Importance', ascending=True)
+                fig_imp = go.Figure(go.Bar(x=imp_df['Importance'], y=imp_df['Feature'],
+                                           orientation='h', marker_color='#44aaff'))
+                fig_imp.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=320,
+                                      margin=dict(l=10,r=10,t=10,b=10))
+                st.plotly_chart(fig_imp, use_container_width=True, config={"displayModeBar":False})
 
             st.warning("⚠️ תחזיות ML הן הסתברותיות בלבד ואינן ערובה לתשואה. תמיד בצע Due Diligence עצמאי.")
         else:
@@ -1207,28 +1344,29 @@ with t_ai:
 with t_scan:
     st.subheader("🔥 סורק הזדמנויות מתקדם")
 
-    col_s1,col_s2,col_s3 = st.columns(3)
-    with col_s1:
-        scan_universe = st.selectbox("יקום סריקה:", [
-            "Mega Watchlist (18)", "NASDAQ 100 (Sample 40)",
-            "S&P 500 (Sample 40)", "Tech Giants",
+    sc1,sc2 = st.columns(2)
+    with sc1:
+        scan_universe = st.selectbox("יקום:", [
+            "Mega Watchlist (18)", "NASDAQ 100 (40)",
+            "S&P 500 (40)", "Tech Giants",
             "Value Plays", "High Growth", "Dividend Stocks",
             "ETFs", "Israeli Stocks (TA)"
         ])
-    with col_s2:
-        min_score = st.slider("Quant Score מינימלי:", 40, 90, 60)
-    with col_s3:
-        sector_filter = st.selectbox("סקטור:", ["כל הסקטורים","Technology","Healthcare",
-                                                  "Financial Services","Consumer Cyclical",
-                                                  "Energy","Industrials","Real Estate"])
+    with sc2:
+        min_score = st.slider("Score מינימלי:", 40, 90, 60)
 
-    col_f1,col_f2,col_f3 = st.columns(3)
-    with col_f1:
-        max_pe = st.number_input("P/E מקסימלי (0=ללא):", value=0, min_value=0)
-    with col_f2:
-        min_growth = st.number_input("Growth % מינימלי:", value=0)
-    with col_f3:
-        min_div = st.number_input("Dividend % מינימלי:", value=0.0, step=0.5)
+    with st.expander("🔽 פילטרים נוספים"):
+        sf1,sf2 = st.columns(2)
+        sector_filter = sf1.selectbox("סקטור:", ["הכל","Technology","Healthcare",
+                                                   "Financial Services","Consumer Cyclical",
+                                                   "Energy","Industrials","Real Estate"])
+        max_pe = sf2.number_input("P/E מקס (0=ללא):", value=0, min_value=0)
+        sf3,sf4 = st.columns(2)
+        min_growth = sf3.number_input("Growth% מינ:", value=0)
+        min_div    = sf4.number_input("Div% מינ:", value=0.0, step=0.5)
+
+    # normalize sector filter value
+    if sector_filter == "הכל": sector_filter = "כל הסקטורים"
 
     if st.button("🔍 הרץ סריקה"):
         with st.spinner("סורק..."):
@@ -1267,50 +1405,50 @@ with t_scan:
             st.markdown(f"### נמצאו **{len(results)}** מניות")
 
             if results:
-                # Category columns
-                col_buy,col_val,col_grw,col_swi = st.columns(4)
-                with col_buy:
-                    st.markdown("### 🟢 BUY")
-                    for t,d in results:
-                        if d.get('signal') in ['STRONG BUY','BUY']:
-                            st.success(f"**{t}** | {d['score']}/100\nRSI:{d['rsi']:.0f} Trend:{d['trend']}\nUpside:{d.get('target_upside',0):.1f}%")
-                with col_val:
-                    st.markdown("### 💎 Value")
-                    for t,d in results:
-                        if 0 < d.get('pe',99) < 20:
-                            st.info(f"**{t}** | P/E:{d['pe']:.1f}\nP/B:{d.get('pb',0):.1f} ROE:{d.get('roe',0):.1f}%\n{d['score']}/100")
-                with col_grw:
-                    st.markdown("### 🚀 Growth")
-                    for t,d in results:
-                        if d.get('growth_yoy',0) > 15:
-                            st.warning(f"**{t}** | Gr:{d['growth_yoy']:.0f}%\nMargin:{d.get('gross_margin',0):.0f}%\n{d['score']}/100")
-                with col_swi:
-                    st.markdown("### ⚡ Swing")
-                    for t,d in results:
-                        if d.get('rsi',50)<42 and 'Up' in d.get('trend',''):
-                            st.error(f"**{t}** | RSI:{d['rsi']:.0f}\nMACD:{'✅' if d.get('macd_crossover') else '❌'}\n{d['score']}/100")
+                # Mobile-friendly: cards sorted by score
+                sig_clr_map = {
+                    'STRONG BUY':'#00ff88','BUY':'#44dd88','WATCH':'#44aaff',
+                    'HOLD':'#ffaa00','SELL':'#ff6688','STRONG SELL':'#ff2244','AVOID':'#ff8844'
+                }
+                for t, d in results[:20]:  # cap at 20 for mobile performance
+                    sc   = d.get('score',50)
+                    sc_color = '#00ff88' if sc>=70 else '#44aaff' if sc>=55 else '#ffaa00'
+                    sig  = d.get('signal','')
+                    s_cl = sig_clr_map.get(sig,'#ffaa00')
+                    up   = d.get('target_upside',0)
+                    st.markdown(
+                        f'<div class="stock-card">'
+                        f'  <div>'
+                        f'    <div class="stock-ticker">{t}</div>'
+                        f'    <div class="stock-name">{d.get("sector","")[:16]}</div>'
+                        f'    <div style="font-size:0.65rem;color:#7a8ab0;margin-top:2px">'
+                        f'      P/E {d["pe"]:.0f} · Gr {d.get("growth_yoy",0):.0f}% · RSI {d["rsi"]:.0f}'
+                        f'    </div>'
+                        f'  </div>'
+                        f'  <div style="text-align:center">'
+                        f'    <div class="stock-price">${d["price"]:,.2f}</div>'
+                        f'    <div style="font-size:0.72rem;color:#44aaff">▲ {up:.1f}% upside</div>'
+                        f'  </div>'
+                        f'  <div style="text-align:right">'
+                        f'    <div class="stock-signal" style="color:{s_cl}">{sig}</div>'
+                        f'    <div style="font-size:0.85rem;font-weight:700;color:{sc_color}">{sc}/100</div>'
+                        f'    <div style="font-size:0.65rem;color:#7a8ab0">{"MACD✅" if d.get("macd_crossover") else ""}</div>'
+                        f'  </div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
 
-                # Full table
-                st.markdown("### 📋 טבלת תוצאות")
-                table_data = []
-                for t,d in results:
-                    table_data.append({
-                        'Ticker':t,'Score':d['score'],'Signal':d['signal'],
-                        'Price':f"${d['price']:.2f}",'RSI':round(d['rsi'],1),
-                        'Trend':d['trend'],'P/E':round(d['pe'],1),
-                        'Growth%':round(d.get('growth_yoy',0),1),
-                        'Div%':round(d.get('div',0),2),
-                        'Upside%':round(d.get('target_upside',0),1),
-                        'Sector':d['sector'],
-                        'MACD✅':'✅' if d.get('macd_crossover') else '',
-                        'Beta':round(d.get('beta',1),2),
-                        'Short%':round(d.get('short_pct',0),1),
-                        'Analyst':d.get('analyst','none'),
-                    })
-                tbl_df = pd.DataFrame(table_data)
-                st.dataframe(tbl_df, use_container_width=True)
-                scan_csv = tbl_df.to_csv(index=False)
-                st.download_button("📥 ייצוא תוצאות", scan_csv, "scan_results.csv", "text/csv")
+                with st.expander("📋 טבלה מלאה"):
+                    table_data = [{'Ticker':t,'Score':d['score'],'Signal':d['signal'],
+                                   'Price':f"${d['price']:.2f}",'RSI':round(d['rsi'],1),
+                                   'Trend':d['trend'],'P/E':round(d['pe'],1),
+                                   'Growth%':round(d.get('growth_yoy',0),1),
+                                   'Div%':round(d.get('div',0),2),
+                                   'Upside%':round(d.get('target_upside',0),1)}
+                                  for t,d in results]
+                    tbl_df = pd.DataFrame(table_data)
+                    st.dataframe(tbl_df, use_container_width=True)
+                    st.download_button("📥 ייצוא", tbl_df.to_csv(index=False), "scan.csv", "text/csv")
 
 # ==========================================
 # TAB 6: RISK ANALYSIS
@@ -1340,15 +1478,6 @@ with t_risk:
         risk_df = pd.DataFrame(risk_rows)
         st.dataframe(risk_df, use_container_width=True)
 
-        if corr is not None and len(p_tickers)>1:
-            st.markdown("### 🔗 מטריצת מתאמים")
-            fig_corr = px.imshow(corr, color_continuous_scale='RdBu_r',
-                                 zmin=-1, zmax=1, text_auto='.2f',
-                                 title="מתאם בין מניות (0=גיוון, 1=זהות)")
-            fig_corr.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=500)
-            st.plotly_chart(fig_corr, use_container_width=True)
-            st.info("💡 מתאם נמוך = פיזור טוב. SPY 1Y Return: {:.1f}%".format(spy_ret_1y))
-
         if rows:
             total_v   = sum(r['Value $'] for r in rows)
             port_beta = sum(m_data[r['Ticker']].get('beta',1)*r['Value $']/total_v
@@ -1357,46 +1486,49 @@ with t_risk:
             worst_dd   = min(max_dd.values()) if max_dd else 0
             worst_t    = min(max_dd, key=max_dd.get) if max_dd else '-'
 
-            c1,c2,c3,c4 = st.columns(4)
-            c1.metric("Beta של התיק", f"{port_beta:.2f}",
-                      "⚡ תנודתי" if port_beta>1.2 else "🛡️ מאוזן")
-            c2.metric("Sharpe ממוצע", f"{avg_sharpe:.2f}",
-                      "✅ טוב" if avg_sharpe>1 else "⚠️" if avg_sharpe>0 else "❌")
-            c3.metric("Max Drawdown (worst)", f"{worst_dd:.1f}% ({worst_t})")
-            c4.metric("SPY 1Y Return", f"{spy_ret_1y:.1f}%")
+            # 2×2 risk metrics
+            rk1,rk2 = st.columns(2)
+            rk1.metric("Beta", f"{port_beta:.2f}", "⚡ תנודתי" if port_beta>1.2 else "🛡️ מאוזן")
+            rk2.metric("Sharpe", f"{avg_sharpe:.2f}", "✅" if avg_sharpe>1 else "⚠️" if avg_sharpe>0 else "❌")
+            rk3,rk4 = st.columns(2)
+            rk3.metric("Max Drawdown", f"{worst_dd:.1f}%", worst_t)
+            rk4.metric("SPY 1Y", f"{spy_ret_1y:.1f}%")
 
-            # Monte Carlo
-            st.markdown("### 🎲 Monte Carlo Simulation (1 Year)")
-            if rows and total_v > 0:
-                n_sim = 500
-                n_days = 252
-                avg_ret  = float(np.mean([m_data[r['Ticker']].get('mom_1m',0)/100/20
-                                          for r in rows if r['Ticker'] in m_data]))
-                avg_vol  = float(np.mean([m_data[r['Ticker']].get('atr_pct',2)/100/np.sqrt(20)
-                                          for r in rows if r['Ticker'] in m_data]))
-                sims = []
-                for _ in range(n_sim):
-                    path = [total_v]
-                    for _ in range(n_days):
-                        path.append(path[-1] * (1 + np.random.normal(avg_ret, avg_vol)))
-                    sims.append(path[-1])
-                sims = np.array(sims)
-                p5   = float(np.percentile(sims, 5))
-                p50  = float(np.percentile(sims, 50))
-                p95  = float(np.percentile(sims, 95))
+        if corr is not None and len(p_tickers)>1:
+            with st.expander("🔗 מטריצת מתאמים"):
+                fig_corr = px.imshow(corr, color_continuous_scale='RdBu_r',
+                                     zmin=-1, zmax=1, text_auto='.2f')
+                fig_corr.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white', height=380,
+                                       margin=dict(l=10,r=10,t=10,b=10))
+                st.plotly_chart(fig_corr, use_container_width=True, config={"displayModeBar":False})
+                st.caption(f"SPY 1Y Return: {spy_ret_1y:.1f}% · מתאם נמוך = גיוון טוב")
+
+        if rows and total_v > 0:
+            with st.expander("🎲 Monte Carlo Simulation (1Y)"):
+                n_sim  = 500; n_days = 252
+                avg_ret = float(np.mean([m_data[r['Ticker']].get('mom_1m',0)/100/20
+                                         for r in rows if r['Ticker'] in m_data]))
+                avg_vol = float(np.mean([m_data[r['Ticker']].get('atr_pct',2)/100/np.sqrt(20)
+                                         for r in rows if r['Ticker'] in m_data]))
+                sims = np.array([
+                    np.prod(1 + np.random.normal(avg_ret, avg_vol, n_days)) * total_v
+                    for _ in range(n_sim)
+                ])
+                p5  = float(np.percentile(sims, 5))
+                p50 = float(np.percentile(sims, 50))
+                p95 = float(np.percentile(sims, 95))
                 fig_mc = go.Figure()
-                fig_mc.add_trace(go.Histogram(x=sims, nbinsx=50,
-                                              marker_color='rgba(68,170,255,0.6)', name='Simulations'))
-                for val, color, lbl in [(p5,'#ff4466','5th pct'),(p50,'#ffaa00','Median'),(p95,'#00ff88','95th pct')]:
-                    fig_mc.add_vline(x=val, line_dash='dash', line_color=color, annotation_text=f"${val:,.0f} ({lbl})")
-                fig_mc.update_layout(title=f"Monte Carlo 1Y | 500 sims | Start: ${total_v:,.0f}",
-                                     paper_bgcolor='rgba(0,0,0,0)', font_color='white',
-                                     xaxis_title="Portfolio Value ($)", height=350)
-                st.plotly_chart(fig_mc, use_container_width=True)
-                c1,c2,c3 = st.columns(3)
-                c1.metric("5th Percentile (Worst)",   f"${p5:,.0f}", f"{(p5/total_v-1)*100:.1f}%")
-                c2.metric("Median Outcome",            f"${p50:,.0f}", f"{(p50/total_v-1)*100:.1f}%")
-                c3.metric("95th Percentile (Best)",    f"${p95:,.0f}", f"{(p95/total_v-1)*100:.1f}%")
+                fig_mc.add_trace(go.Histogram(x=sims, nbinsx=40, marker_color='rgba(68,170,255,0.6)'))
+                for val, clr, lbl in [(p5,'#ff4466','5%'),(p50,'#ffaa00','50%'),(p95,'#00ff88','95%')]:
+                    fig_mc.add_vline(x=val, line_dash='dash', line_color=clr,
+                                     annotation_text=f"${val:,.0f}")
+                fig_mc.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white',
+                                     height=280, margin=dict(l=10,r=10,t=10,b=10))
+                st.plotly_chart(fig_mc, use_container_width=True, config={"displayModeBar":False})
+                mc1,mc2,mc3 = st.columns(3)
+                mc1.metric("Worst 5%",  f"${p5:,.0f}",  f"{(p5/total_v-1)*100:.1f}%")
+                mc2.metric("Median",    f"${p50:,.0f}", f"{(p50/total_v-1)*100:.1f}%")
+                mc3.metric("Best 95%",  f"${p95:,.0f}", f"{(p95/total_v-1)*100:.1f}%")
     else:
         st.info("הוסף מניות לתיק.")
 
