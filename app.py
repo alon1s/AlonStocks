@@ -710,6 +710,18 @@ def fetch_expert_data(tickers_to_fetch):
             data[result[0]] = result[1]
     return data
 
+@st.cache_data(ttl=900)
+def get_stock_history(ticker, period):
+    try:
+        raw = yf.download([ticker], period=period, auto_adjust=True, progress=False, threads=False)
+        if isinstance(raw.columns, pd.MultiIndex):
+            if ticker not in raw.columns.get_level_values(-1):
+                return pd.DataFrame()
+            return raw.xs(ticker, axis=1, level=-1).dropna(how='all')
+        return raw.dropna(how='all')
+    except Exception:
+        return pd.DataFrame()
+
 @st.cache_data(ttl=1800)
 def compute_portfolio_analytics(tickers):
     try:
@@ -1271,8 +1283,7 @@ with t_tech:
 
     if analyze_ticker:
         with st.spinner(f"טוען {analyze_ticker}..."):
-            stock = yf.Ticker(analyze_ticker)
-            hist = stock.history(period=period_choice)
+            hist = get_stock_history(analyze_ticker, period_choice)
 
         if not hist.empty:
             d = m_data.get(analyze_ticker, {})
@@ -1358,6 +1369,8 @@ with t_tech:
                     half = len(ind_df) // 2
                     c_i1.dataframe(ind_df.iloc[:half], use_container_width=True, hide_index=True)
                     c_i2.dataframe(ind_df.iloc[half:], use_container_width=True, hide_index=True)
+                else:
+                    st.warning("נתוני Yahoo Finance אינם זמינים כרגע. נסה/י שוב בעוד דקה.")
 
 # ==========================================
 # TAB: OPPORTUNITIES
