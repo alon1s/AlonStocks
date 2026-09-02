@@ -14,6 +14,7 @@ import requests
 from io import StringIO
 import concurrent.futures
 import random
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -234,7 +235,13 @@ session.headers.update({'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_cloud_portfolio():
-    empty = pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice']).set_index('Ticker')
+    defaults = pd.DataFrame([
+        {'Ticker': 'MSFT', 'Quantity': 7.4156, 'PurchasePrice': 371.17},
+        {'Ticker': 'VOO', 'Quantity': 4.5496, 'PurchasePrice': 683.57},
+        {'Ticker': 'META', 'Quantity': 3.0, 'PurchasePrice': 559.56},
+        {'Ticker': 'ESLT', 'Quantity': 1.0, 'PurchasePrice': 780.25},
+        {'Ticker': 'MU', 'Quantity': 2.0, 'PurchasePrice': 993.89},
+    ]).set_index('Ticker')
     try:
         df = conn.read(worksheet="Portfolio", ttl=0)
         if df is None or df.empty:
@@ -253,7 +260,7 @@ def load_cloud_portfolio():
                     return local.set_index('Ticker')
             except (OSError, ValueError, pd.errors.ParserError):
                 pass
-        return empty
+        return defaults
 
 def save_cloud_portfolio(df):
     try:
@@ -305,22 +312,6 @@ def save_watchlist(df):
     except Exception:
         pass
 
-def log_activity(ticker, action, qty, price, notes=""):
-    try:
-        new_log = pd.DataFrame([{
-            "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Ticker": ticker, "Action": action,
-            "Quantity": float(qty), "Price": float(price), "Notes": notes
-        }])
-        try:
-            existing = conn.read(worksheet="Activity", ttl=0)
-        except Exception:
-            existing = pd.DataFrame()
-        updated = pd.concat([existing, new_log], ignore_index=True) if not existing.empty else new_log
-        conn.update(worksheet="Activity", data=updated)
-    except Exception:
-        pass
-
 def apply_trade(portfolio, ticker, action, qty, price):
     """Buy/sell against the in-memory portfolio. Returns updated df."""
     if action == "Buy":
@@ -338,6 +329,16 @@ def apply_trade(portfolio, ticker, action, qty, price):
             else:
                 portfolio.loc[ticker, 'Quantity'] = nq
     return portfolio
+
+def clean_portfolio_editor(data):
+    required = ['Ticker', 'Quantity', 'PurchasePrice']
+    cleaned = data.reindex(columns=required).copy()
+    cleaned['Ticker'] = cleaned['Ticker'].fillna('').astype(str).str.strip().str.upper()
+    cleaned['Quantity'] = pd.to_numeric(cleaned['Quantity'], errors='coerce').fillna(0)
+    cleaned['PurchasePrice'] = pd.to_numeric(cleaned['PurchasePrice'], errors='coerce').fillna(0)
+    cleaned = cleaned[(cleaned['Ticker'] != '') & (cleaned['Quantity'] > 0) & (cleaned['PurchasePrice'] > 0)]
+    cleaned = cleaned.drop_duplicates('Ticker', keep='last').set_index('Ticker')
+    return cleaned[['Quantity', 'PurchasePrice']]
 
 if 'portfolio' not in st.session_state:
     st.session_state.portfolio = load_cloud_portfolio()
@@ -633,52 +634,58 @@ def playbook_line(d):
 @st.cache_data(ttl=900)
 def fetch_expert_data(tickers_to_fetch):
     data = {}
-    valid_list = [t for t in tickers_to_fetch if isinstance(t, str) and t.strip()]
+    valid_list = list(dict.fromkeys(t for t in tickers_to_fetch if isinstance(t, str) and t.strip()))
 
     def fetch_single(t):
-        try:
-            stock = yf.Ticker(t)
-            hist = stock.history(period="2y")
-            if len(hist) < 50:
-                return None
-            info = stock.info
-            curr = hist['Close'].iloc[-1]
-            ind = compute_advanced_indicators(hist)
-            score, reasons = compute_composite_score(ind, info)
-            signal = get_signal(score, ind['rsi'], ind['trend_score'])
-            div_yield = (info.get('dividendYield') or 0) * 100
+        for attempt in range(3):
+            try:
+                stock = yf.Ticker(t)
+                hist = stock.history(period="2y")
+                if len(hist) < 50:
+                    return None
+                info = stock.info
+                curr = hist['Close'].iloc[-1]
+                ind = compute_advanced_indicators(hist)
+                score, reasons = compute_composite_score(ind, info)
+                signal = get_signal(score, ind['rsi'], ind['trend_score'])
+                div_yield = (info.get('dividendYield') or 0) * 100
 
-            return t, {
-                'price': float(curr), 'sector': info.get('sector', 'Unknown'),
-                'industry': info.get('industry', 'Unknown'), 'name': info.get('longName', t),
-                'pe': info.get('trailingPE', 0) or 0, 'forward_pe': info.get('forwardPE', 0) or 0,
-                'peg': info.get('pegRatio', 0) or 0, 'ps': info.get('priceToSalesTrailing12Months', 0) or 0,
-                'pb': info.get('priceToBook', 0) or 0, 'beta': info.get('beta', 1.0) or 1.0,
-                'div': div_yield, 'market_cap': info.get('marketCap', 0) or 0,
-                'revenue': info.get('totalRevenue', 0) or 0,
-                'gross_margin': (info.get('grossMargins', 0) or 0) * 100,
-                'profit_margin': (info.get('profitMargins', 0) or 0) * 100,
-                'roe': (info.get('returnOnEquity', 0) or 0) * 100,
-                'debt_to_equity': info.get('debtToEquity', 0) or 0,
-                'current_ratio': info.get('currentRatio', 0) or 0,
-                'growth_yoy': (info.get('revenueGrowth', 0) or 0) * 100,
-                'earnings_growth': (info.get('earningsGrowth', 0) or 0) * 100,
-                'analyst': info.get('recommendationKey', 'none'),
-                'target_price': info.get('targetMeanPrice', curr) or curr,
-                'target_upside': ((info.get('targetMeanPrice', curr) or curr) - curr) / curr * 100,
-                'target_low': info.get('targetLowPrice', curr) or curr,
-                'target_high': info.get('targetHighPrice', curr) or curr,
-                'num_analysts': info.get('numberOfAnalystOpinions', 0) or 0,
-                'short_pct': (info.get('shortPercentOfFloat') or 0) * 100,
-                'inst_own': (info.get('institutionsPercentHeld') or 0) * 100,
-                'currency': "ILS" if str(t).endswith(".TA") else "USD",
-                **ind, 'score': score, 'reasons': reasons, 'signal': signal,
-                'signal_color': SIGNAL_COLOR.get(signal, 'var(--text-dim)'),
-            }
-        except Exception:
-            return None
+                return t, {
+                    'price': float(curr), 'sector': info.get('sector', 'Unknown'),
+                    'industry': info.get('industry', 'Unknown'), 'name': info.get('longName', t),
+                    'pe': info.get('trailingPE', 0) or 0, 'forward_pe': info.get('forwardPE', 0) or 0,
+                    'peg': info.get('pegRatio', 0) or 0, 'ps': info.get('priceToSalesTrailing12Months', 0) or 0,
+                    'pb': info.get('priceToBook', 0) or 0, 'beta': info.get('beta', 1.0) or 1.0,
+                    'div': div_yield, 'market_cap': info.get('marketCap', 0) or 0,
+                    'revenue': info.get('totalRevenue', 0) or 0,
+                    'gross_margin': (info.get('grossMargins', 0) or 0) * 100,
+                    'profit_margin': (info.get('profitMargins', 0) or 0) * 100,
+                    'roe': (info.get('returnOnEquity', 0) or 0) * 100,
+                    'debt_to_equity': info.get('debtToEquity', 0) or 0,
+                    'current_ratio': info.get('currentRatio', 0) or 0,
+                    'growth_yoy': (info.get('revenueGrowth', 0) or 0) * 100,
+                    'earnings_growth': (info.get('earningsGrowth', 0) or 0) * 100,
+                    'analyst': info.get('recommendationKey', 'none'),
+                    'target_price': info.get('targetMeanPrice', curr) or curr,
+                    'target_upside': ((info.get('targetMeanPrice', curr) or curr) - curr) / curr * 100,
+                    'target_low': info.get('targetLowPrice', curr) or curr,
+                    'target_high': info.get('targetHighPrice', curr) or curr,
+                    'num_analysts': info.get('numberOfAnalystOpinions', 0) or 0,
+                    'short_pct': (info.get('shortPercentOfFloat') or 0) * 100,
+                    'inst_own': (info.get('institutionsPercentHeld') or 0) * 100,
+                    'currency': "ILS" if str(t).endswith(".TA") else "USD",
+                    **ind, 'score': score, 'reasons': reasons, 'signal': signal,
+                    'signal_color': SIGNAL_COLOR.get(signal, 'var(--text-dim)'),
+                }
+            except Exception as exc:
+                if attempt == 2:
+                    return None
+                if 'RateLimit' in type(exc).__name__ or 'Too Many Requests' in str(exc):
+                    time.sleep(2 ** attempt)
+                else:
+                    return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
         for r in ex.map(fetch_single, valid_list):
             if r:
                 data[r[0]] = r[1]
@@ -809,14 +816,20 @@ def parse_portfolio_image(image):
     Always requires manual review before it touches the real portfolio."""
     if not OCR_AVAILABLE:
         return pd.DataFrame(columns=['Ticker', 'Quantity', 'PurchasePrice'])
-    text = pytesseract.image_to_string(image)
+    image = image.convert('RGB')
+    image.thumbnail((1800, 1800))
+    text = pytesseract.image_to_string(image, config='--psm 6')
+    normalized = text.upper().replace('—', '-').replace('–', '-')
+    known_tickers = ['MSFT', 'VOO', 'META', 'ESLT', 'MU', 'NUVB']
     rows = []
-    for line in text.split('\n'):
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+    for line_number, line in enumerate(lines):
         line = line.strip()
-        if not line:
-            continue
-        tickers_found = [w for w in TICKER_PATTERN.findall(line) if w not in EXCLUDE_WORDS]
-        numbers_found = [n.replace(',', '') for n in NUMBER_PATTERN.findall(line)]
+        tickers_found = [t for t in known_tickers if re.search(rf'\b{t}\b', line)]
+        if not tickers_found:
+            tickers_found = [w for w in TICKER_PATTERN.findall(line) if w not in EXCLUDE_WORDS]
+        context = ' '.join(lines[line_number:line_number + 8])
+        numbers_found = [n.replace(',', '') for n in NUMBER_PATTERN.findall(context)]
         if not tickers_found or not numbers_found:
             continue
         nums = []
@@ -827,10 +840,14 @@ def parse_portfolio_image(image):
                 pass
         if not nums:
             continue
-        qty = nums[0] if len(nums) >= 1 else 0.0
-        price = nums[1] if len(nums) >= 2 else 0.0
+        qty_match = re.search(r'(?:QTY|QUANTITY|כמות)\D{0,20}(\d+(?:\.\d+)?)', context, re.IGNORECASE)
+        price_match = re.search(r'(?:AVG|AVERAGE|BUY|PURCHASE|קניה|קנייה)\D{0,30}(\d[\d,.]*)', context, re.IGNORECASE)
+        qty = float(qty_match.group(1).replace(',', '')) if qty_match else min(nums, key=lambda n: abs(n - round(n)))
+        price = float(price_match.group(1).replace(',', '')) if price_match else (nums[1] if len(nums) > 1 else 0.0)
+        if price <= 0 or qty <= 0:
+            continue
         rows.append({'Ticker': tickers_found[0], 'Quantity': qty, 'PurchasePrice': price})
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows).drop_duplicates('Ticker', keep='first')
 
 # ==========================================
 # SHARED UI HELPERS
@@ -906,13 +923,13 @@ all_analyze = list(set(p_tickers + watch_tickers + ['SPY', 'QQQ', '^VIX']))
 if quick_ticker:
     all_analyze.append(quick_ticker)
 m_data = fetch_expert_data(tuple(all_analyze))
-core_data = fetch_expert_data(tuple(CORE_UNIVERSE))
+core_data = {}
 
 # ==========================================
 # TABS
 # ==========================================
-tabs = st.tabs(["היום", "תיק", "טכני", "הזדמנויות", "רווחים וחדשות", "סיכון וכלים", "יומן"])
-t_brief, t_port, t_tech, t_scan, t_earn, t_risk, t_journal = tabs
+tabs = st.tabs(["היום", "תיק", "טכני", "הזדמנויות", "רווחים וחדשות", "סיכון וכלים"])
+t_brief, t_port, t_tech, t_scan, t_earn, t_risk = tabs
 
 # ==========================================
 # TAB: BRIEF (HOME)
@@ -1059,6 +1076,24 @@ with t_brief:
 # TAB: PORTFOLIO
 # ==========================================
 with t_port:
+    section("עריכה מהירה של התיק", "שנה/י כמות או מחיר, הוסף/י שורה חדשה, או מחק/י שורה ואז שמור/י.")
+    editor_source = st.session_state.portfolio.reset_index()
+    edited_portfolio = st.data_editor(
+        editor_source, num_rows="dynamic", use_container_width=True,
+        column_config={
+            'Ticker': st.column_config.TextColumn('סימול', required=True),
+            'Quantity': st.column_config.NumberColumn('כמות', min_value=0, step=0.0001, format='%.4f'),
+            'PurchasePrice': st.column_config.NumberColumn('מחיר קנייה', min_value=0, step=0.01, format='%.2f'),
+        }, hide_index=True, key='portfolio_editor'
+    )
+    if st.button("שמור שינויים בתיק", type="primary", use_container_width=True):
+        cleaned = clean_portfolio_editor(edited_portfolio)
+        st.session_state.portfolio = cleaned
+        if save_cloud_portfolio(cleaned):
+            st.success("התיק נשמר")
+            st.rerun()
+        st.error("לא ניתן לשמור כרגע. בדוק/י את חיבור Google Sheets.")
+
     stock_val_usd, rows, sector_weights, cost_basis = 0.0, [], {}, 0.0
 
     for t, row in st.session_state.portfolio.iterrows():
@@ -1095,22 +1130,21 @@ with t_port:
     r2c1.metric("USD/ILS", f"₪{usd_ils_rate:.3f}")
     r2c2.metric("דיבידנד שנתי", f"${total_div:.0f}")
 
-    section("ביצוע עסקה")
-    with st.form("quick_trade_main", clear_on_submit=True):
-        qc1, qc2 = st.columns([3, 2])
-        qt_ticker = qc1.text_input("סימול מניה", placeholder="AAPL / TSLA / MSFT").upper()
-        qt_action = qc2.selectbox("פעולה", ["קנייה", "מכירה"])
-        qc3, qc4 = st.columns(2)
-        qt_qty = qc3.number_input("כמות", min_value=0.0, step=0.1, value=1.0)
-        qt_price = qc4.number_input("מחיר $", min_value=0.0, step=0.01, value=0.0)
-        if st.form_submit_button(f"בצע {qt_action}", use_container_width=True):
-            action_str = "Buy" if qt_action == "קנייה" else "Sell"
-            if qt_ticker and qt_qty > 0:
-                st.session_state.portfolio = apply_trade(st.session_state.portfolio, qt_ticker, action_str, qt_qty, qt_price)
-                if save_cloud_portfolio(st.session_state.portfolio):
-                    log_activity(qt_ticker, action_str, qt_qty, qt_price)
-                    st.success(f"{qt_action} של {qt_ticker} בוצעה")
-                    st.rerun()
+    with st.expander("פעולה מהירה: קנייה או מכירה"):
+        with st.form("quick_trade_main", clear_on_submit=True):
+            qc1, qc2 = st.columns([3, 2])
+            qt_ticker = qc1.text_input("סימול מניה", placeholder="AAPL / TSLA / MSFT").upper()
+            qt_action = qc2.selectbox("פעולה", ["קנייה", "מכירה"])
+            qc3, qc4 = st.columns(2)
+            qt_qty = qc3.number_input("כמות", min_value=0.0, step=0.1, value=1.0)
+            qt_price = qc4.number_input("מחיר $", min_value=0.0, step=0.01, value=0.0)
+            if st.form_submit_button(f"בצע {qt_action}", use_container_width=True):
+                action_str = "Buy" if qt_action == "קנייה" else "Sell"
+                if qt_ticker and qt_qty > 0:
+                    st.session_state.portfolio = apply_trade(st.session_state.portfolio, qt_ticker, action_str, qt_qty, qt_price)
+                    if save_cloud_portfolio(st.session_state.portfolio):
+                        st.success(f"{qt_action} של {qt_ticker} בוצעה")
+                        st.rerun()
 
     section("ייבוא מתמונת מסך", "צלם/י צילום מסך של האפליקציה של הברוקר — נזהה סימולים, כמויות ומחירים באופן ראשוני. תמיד תוכל/י לערוך לפני שמירה.")
     if not OCR_AVAILABLE:
@@ -1673,34 +1707,3 @@ with t_risk:
             c4.metric("Take Profit", f"${target_p:.2f}", f"+{ps_target}%")
             rr_color = 'var(--gain)' if rr_ratio >= 2 else 'var(--gold)' if rr_ratio >= 1.5 else 'var(--loss)'
             st.markdown(f"<span style='color:{rr_color};font-weight:600'>יחס סיכוי/סיכון 1:{rr_ratio:.1f}</span>", unsafe_allow_html=True)
-
-# ==========================================
-# TAB: JOURNAL
-# ==========================================
-with t_journal:
-    section("יומן פעולות")
-    try:
-        logs = conn.read(worksheet="Activity", ttl=0)
-        if logs is not None and not logs.empty:
-            logs_sorted = logs.sort_values("Date", ascending=False)
-            st.dataframe(logs_sorted, use_container_width=True)
-
-            buys, sells = logs[logs['Action'] == 'Buy'], logs[logs['Action'] == 'Sell']
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("סה\"כ פעולות", len(logs))
-            c2.metric("קניות", len(buys))
-            c3.metric("מכירות", len(sells))
-            if len(buys) > 0:
-                c4.metric("סה\"כ הושקע", f"${(buys['Quantity']*buys['Price']).sum():,.2f}")
-
-            if len(logs) > 1:
-                fig_act = px.bar(logs.sort_values("Date"), x='Date', y='Quantity', color='Action',
-                                  color_discrete_map={'Buy': '#55A87F', 'Sell': '#C1584F'})
-                fig_act.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='#ECECEE', height=320)
-                st.plotly_chart(fig_act, use_container_width=True)
-
-            st.download_button("ייצוא יומן", logs_sorted.to_csv(index=False), "journal.csv", "text/csv")
-        else:
-            st.info("אין פעולות עדיין.")
-    except Exception:
-        st.info("לא ניתן לטעון יומן פעולות.")
