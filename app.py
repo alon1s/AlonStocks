@@ -393,9 +393,23 @@ MARKET_TICKERS = {
 @st.cache_data(ttl=600)
 def get_usd_ils():
     try:
-        return yf.Ticker("USDILS=X").fast_info['lastPrice']
+        rate = float(yf.Ticker("USDILS=X").fast_info['lastPrice'])
+        if np.isfinite(rate) and rate > 0:
+            return rate
     except Exception:
-        return 3.75
+        pass
+    try:
+        response = requests.get(
+            "https://api.frankfurter.app/latest?from=USD&to=ILS",
+            headers=session.headers, timeout=8,
+        )
+        response.raise_for_status()
+        rate = float(response.json()['rates']['ILS'])
+        if np.isfinite(rate) and rate > 0:
+            return rate
+    except (OSError, ValueError, KeyError, requests.RequestException):
+        pass
+    return None
 
 @st.cache_data(ttl=300)
 def get_market_overview():
@@ -881,6 +895,9 @@ def section(title, subtitle=None):
 # SIDEBAR
 # ==========================================
 usd_ils_rate = get_usd_ils()
+if usd_ils_rate is None:
+    st.error("לא ניתן לקבל כרגע שער USD/ILS חי. נסה/י לרענן בעוד רגע.")
+    st.stop()
 market_data = get_market_overview()
 
 with st.sidebar:
