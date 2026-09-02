@@ -635,60 +635,65 @@ def playbook_line(d):
 def fetch_expert_data(tickers_to_fetch):
     data = {}
     valid_list = list(dict.fromkeys(t for t in tickers_to_fetch if isinstance(t, str) and t.strip()))
+    if not valid_list:
+        return data
+
+    try:
+        raw = yf.download(valid_list, period="2y", auto_adjust=True, progress=False, threads=False)
+    except Exception:
+        return data
 
     def fetch_single(t):
-        for attempt in range(3):
-            try:
-                stock = yf.Ticker(t)
-                hist = stock.history(period="2y")
-                if len(hist) < 50:
+        try:
+            if isinstance(raw.columns, pd.MultiIndex):
+                if t not in raw.columns.get_level_values(-1):
                     return None
-                info = stock.info
-                curr = hist['Close'].iloc[-1]
-                ind = compute_advanced_indicators(hist)
-                score, reasons = compute_composite_score(ind, info)
-                signal = get_signal(score, ind['rsi'], ind['trend_score'])
-                div_yield = (info.get('dividendYield') or 0) * 100
+                hist = raw.xs(t, axis=1, level=-1).dropna(how='all')
+            else:
+                hist = raw.dropna(how='all') if len(valid_list) == 1 else pd.DataFrame()
+            if len(hist) < 50:
+                return None
+            info = {}
+            curr = hist['Close'].iloc[-1]
+            ind = compute_advanced_indicators(hist)
+            score, reasons = compute_composite_score(ind, info)
+            signal = get_signal(score, ind['rsi'], ind['trend_score'])
+            div_yield = (info.get('dividendYield') or 0) * 100
 
-                return t, {
-                    'price': float(curr), 'sector': info.get('sector', 'Unknown'),
-                    'industry': info.get('industry', 'Unknown'), 'name': info.get('longName', t),
-                    'pe': info.get('trailingPE', 0) or 0, 'forward_pe': info.get('forwardPE', 0) or 0,
-                    'peg': info.get('pegRatio', 0) or 0, 'ps': info.get('priceToSalesTrailing12Months', 0) or 0,
-                    'pb': info.get('priceToBook', 0) or 0, 'beta': info.get('beta', 1.0) or 1.0,
-                    'div': div_yield, 'market_cap': info.get('marketCap', 0) or 0,
-                    'revenue': info.get('totalRevenue', 0) or 0,
-                    'gross_margin': (info.get('grossMargins', 0) or 0) * 100,
-                    'profit_margin': (info.get('profitMargins', 0) or 0) * 100,
-                    'roe': (info.get('returnOnEquity', 0) or 0) * 100,
-                    'debt_to_equity': info.get('debtToEquity', 0) or 0,
-                    'current_ratio': info.get('currentRatio', 0) or 0,
-                    'growth_yoy': (info.get('revenueGrowth', 0) or 0) * 100,
-                    'earnings_growth': (info.get('earningsGrowth', 0) or 0) * 100,
-                    'analyst': info.get('recommendationKey', 'none'),
-                    'target_price': info.get('targetMeanPrice', curr) or curr,
-                    'target_upside': ((info.get('targetMeanPrice', curr) or curr) - curr) / curr * 100,
-                    'target_low': info.get('targetLowPrice', curr) or curr,
-                    'target_high': info.get('targetHighPrice', curr) or curr,
-                    'num_analysts': info.get('numberOfAnalystOpinions', 0) or 0,
-                    'short_pct': (info.get('shortPercentOfFloat') or 0) * 100,
-                    'inst_own': (info.get('institutionsPercentHeld') or 0) * 100,
-                    'currency': "ILS" if str(t).endswith(".TA") else "USD",
-                    **ind, 'score': score, 'reasons': reasons, 'signal': signal,
-                    'signal_color': SIGNAL_COLOR.get(signal, 'var(--text-dim)'),
-                }
-            except Exception as exc:
-                if attempt == 2:
-                    return None
-                if 'RateLimit' in type(exc).__name__ or 'Too Many Requests' in str(exc):
-                    time.sleep(2 ** attempt)
-                else:
-                    return None
+            return t, {
+                'price': float(curr), 'sector': info.get('sector', 'Unknown'),
+                'industry': info.get('industry', 'Unknown'), 'name': info.get('longName', t),
+                'pe': info.get('trailingPE', 0) or 0, 'forward_pe': info.get('forwardPE', 0) or 0,
+                'peg': info.get('pegRatio', 0) or 0, 'ps': info.get('priceToSalesTrailing12Months', 0) or 0,
+                'pb': info.get('priceToBook', 0) or 0, 'beta': info.get('beta', 1.0) or 1.0,
+                'div': div_yield, 'market_cap': info.get('marketCap', 0) or 0,
+                'revenue': info.get('totalRevenue', 0) or 0,
+                'gross_margin': (info.get('grossMargins', 0) or 0) * 100,
+                'profit_margin': (info.get('profitMargins', 0) or 0) * 100,
+                'roe': (info.get('returnOnEquity', 0) or 0) * 100,
+                'debt_to_equity': info.get('debtToEquity', 0) or 0,
+                'current_ratio': info.get('currentRatio', 0) or 0,
+                'growth_yoy': (info.get('revenueGrowth', 0) or 0) * 100,
+                'earnings_growth': (info.get('earningsGrowth', 0) or 0) * 100,
+                'analyst': info.get('recommendationKey', 'none'),
+                'target_price': info.get('targetMeanPrice', curr) or curr,
+                'target_upside': ((info.get('targetMeanPrice', curr) or curr) - curr) / curr * 100,
+                'target_low': info.get('targetLowPrice', curr) or curr,
+                'target_high': info.get('targetHighPrice', curr) or curr,
+                'num_analysts': info.get('numberOfAnalystOpinions', 0) or 0,
+                'short_pct': (info.get('shortPercentOfFloat') or 0) * 100,
+                'inst_own': (info.get('institutionsPercentHeld') or 0) * 100,
+                'currency': "ILS" if str(t).endswith(".TA") else "USD",
+                **ind, 'score': score, 'reasons': reasons, 'signal': signal,
+                'signal_color': SIGNAL_COLOR.get(signal, 'var(--text-dim)'),
+            }
+        except Exception:
+            return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
-        for r in ex.map(fetch_single, valid_list):
-            if r:
-                data[r[0]] = r[1]
+    for ticker in valid_list:
+        result = fetch_single(ticker)
+        if result:
+            data[result[0]] = result[1]
     return data
 
 @st.cache_data(ttl=1800)
@@ -1001,7 +1006,7 @@ with t_brief:
             )
 
     # ── Earnings this week (holdings + watchlist) ──
-    brief_tickers = list(set(p_tickers + watch_tickers))
+    brief_tickers = []
     if brief_tickers:
         with st.spinner("בודק תאריכי דוחות..."):
             upcoming, recent = build_earnings_board(tuple(brief_tickers))
@@ -1052,25 +1057,6 @@ with t_brief:
                 ) for t, d in momentum
             ]
             render_ledger(rows_html)
-
-    # ── News digest ──
-    if p_tickers:
-        section("כותרות רלוונטיות לתיק שלך")
-        digest = []
-        for t in p_tickers[:6]:
-            for item in get_stock_news(t, limit=2):
-                digest.append((t, item))
-        digest.sort(key=lambda x: x[1].get('providerPublishTime', 0), reverse=True)
-        for t, item in digest[:6]:
-            try:
-                ts = datetime.fromtimestamp(item.get('providerPublishTime', 0))
-                st.markdown(
-                    f'<div class="news-item"><div class="news-title">{item.get("title","")}</div>'
-                    f'<div class="news-meta">{t} · {item.get("publisher","")} · {ts.strftime("%d.%m %H:%M")}</div></div>',
-                    unsafe_allow_html=True
-                )
-            except Exception:
-                pass
 
 # ==========================================
 # TAB: PORTFOLIO
@@ -1455,7 +1441,7 @@ with t_earn:
 
     with tab_earn:
         board_tickers = list(set(p_tickers + watch_tickers))
-        if board_tickers:
+        if board_tickers and st.button("טען דוחות", key="load_earnings"):
             with st.spinner("טוען לוח דוחות..."):
                 upcoming, recent = build_earnings_board(tuple(board_tickers))
 
@@ -1494,7 +1480,7 @@ with t_earn:
             if (p_tickers or quick_ticker) else None
         if not news_ticker:
             news_ticker = st.text_input("הכנס/י סימול:", key='news_inp').upper() or None
-        if news_ticker:
+        if news_ticker and st.button("טען חדשות", key="load_news"):
             with st.spinner(f"טוען חדשות ל-{news_ticker}..."):
                 news = get_stock_news(news_ticker)
             if news:
