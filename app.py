@@ -166,8 +166,33 @@ st.markdown("""
 
     @media (prefers-reduced-motion: reduce) { .wordmark, .live-dot::after, .hero-value { animation:none; } }
 
-    [data-testid="stButtonGroup"] { overflow-x:auto; scrollbar-width:none; }
-    [data-testid="stButtonGroup"] button p { font-size:0.82rem; }
+    [data-testid="stButtonGroup"] { overflow-x:auto; scrollbar-width:none; width:100%; }
+    [data-testid="stButtonGroup"] [role="radiogroup"] { width:100%; flex-wrap:nowrap !important; padding:1px; box-sizing:border-box; }
+    [data-testid="stButtonGroup"] [role="radiogroup"] > * { flex:1 0 auto; display:flex; }
+    [data-testid="stButtonGroup"] button { flex:1 1 auto; white-space:nowrap; }
+    [data-testid="stButtonGroup"] button p { font-size:0.82rem; overflow:visible !important; text-overflow:clip !important; }
+
+    /* Metric cards: 2 per row on phones, 4 per row on wide screens */
+    [class*="st-key-metrics4"] [data-testid="stHorizontalBlock"] { flex-wrap:wrap !important; }
+    [class*="st-key-metrics4"] [data-testid="stColumn"], [class*="st-key-metrics4"] [data-testid="column"] {
+        flex:1 1 calc(50% - 5px) !important; width:calc(50% - 5px) !important; min-width:calc(50% - 5px) !important; }
+
+    [class*="st-key-metrics4"] [data-testid="stMetric"] { min-height:108px; box-sizing:border-box; }
+
+    /* Positions: cards on phones, full table on larger screens */
+    .st-key-pos_cards { display:none; }
+    @media (max-width: 700px) {
+        .st-key-pos_cards { display:block; }
+        .st-key-pos_table { display:none; }
+    }
+
+    /* Wide screens: use the room */
+    @media (min-width: 1000px) {
+        .main .block-container, [data-testid="stMainBlockContainer"] { max-width:1120px !important; }
+        [class*="st-key-metrics4"] [data-testid="stColumn"], [class*="st-key-metrics4"] [data-testid="column"] {
+            flex:1 1 calc(25% - 8px) !important; width:calc(25% - 8px) !important; min-width:calc(25% - 8px) !important; }
+        .hero-value { font-size:3.4rem; }
+    }
 
     /* Keep columns side by side on phones (2x2 metric grids, inline form fields) */
     [data-testid="stHorizontalBlock"] { flex-wrap:nowrap !important; gap:10px !important; direction:rtl; }
@@ -1356,13 +1381,13 @@ with t_today:
                 f'<div class="badges">{"".join(badges)}</div>'
                 f'<div class="stamp">≈ ₪{total_value * usd_ils:,.0f} לפי שער {usd_ils:.3f} · יום {DAYS_HE[now.weekday()]} {now:%d.%m.%Y}</div></div>',
                 unsafe_allow_html=True)
-    m1, m2 = st.columns(2)
-    m1.metric("שווי מניות", money(stock_value, '$', 0), f"{signed_money(day_pl)} היום",
-              delta_color='normal' if round(day_pl) else 'off', delta_arrow='auto' if round(day_pl) else 'off')
-    m2.metric("מזומן", money(cash_total, '$', 0), f"${cfg['cash_usd']:,.0f} + ₪{cfg['cash_ils']:,.0f}", delta_color='off', delta_arrow='off')
-    m3, m4 = st.columns(2)
-    m3.metric("רווח/הפסד פתוח", signed_money(unreal_total), pct(unreal_total / cost_total * 100 if cost_total else 0))
-    m4.metric("תשואה כוללת", pct(total_return_pct, 1), f"מול ${net_deposits:,.0f} הפקדות", delta_color='off', delta_arrow='off')
+    with st.container(key='metrics4_today'):
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("שווי מניות", money(stock_value, '$', 0), f"{signed_money(day_pl)} היום",
+                  delta_color='normal' if round(day_pl) else 'off', delta_arrow='auto' if round(day_pl) else 'off')
+        m2.metric("מזומן", money(cash_total, '$', 0), f"${cfg['cash_usd']:,.0f} + ₪{cfg['cash_ils']:,.0f}", delta_color='off', delta_arrow='off')
+        m3.metric("רווח/הפסד פתוח", signed_money(unreal_total), pct(unreal_total / cost_total * 100 if cost_total else 0))
+        m4.metric("תשואה כוללת", pct(total_return_pct, 1), f"מול ${net_deposits:,.0f} הפקדות", delta_color='off', delta_arrow='off')
 
     with st.expander("עדכון יתרות מזומן"):
         render_cash_editor('cash_form_today')
@@ -1478,12 +1503,12 @@ with t_pos:
         choice = st.selectbox("תצוגה", ["all"] + [r['ticker'] for r in positions],
                               format_func=lambda x: "כל הפוזיציות" if x == "all" else f"{x} — {names[x]}")
         if choice == "all":
-            c1, c2 = st.columns(2)
-            c1.metric("שווי מניות", money(stock_value, '$', 0), f"{signed_money(day_pl)} היום")
-            c2.metric("רווח/הפסד פתוח", signed_money(unreal_total), pct(unreal_total / cost_total * 100 if cost_total else 0))
-            c3, c4 = st.columns(2)
-            c3.metric("עלות כוללת", money(cost_total, '$', 0))
-            c4.metric("דיבידנד שנתי משוער", money(sum(r['div_annual'] for r in positions), '$', 0))
+            with st.container(key='metrics4_pos'):
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("שווי מניות", money(stock_value, '$', 0), f"{signed_money(day_pl)} היום")
+                c2.metric("רווח/הפסד פתוח", signed_money(unreal_total), pct(unreal_total / cost_total * 100 if cost_total else 0))
+                c3.metric("עלות כוללת", money(cost_total, '$', 0))
+                c4.metric("דיבידנד שנתי משוער", money(sum(r['div_annual'] for r in positions), '$', 0))
 
             table = pd.DataFrame([{
                 'סימול': r['ticker'], 'כמות': r['qty'], 'מחיר': money(r['price'], r['sym']),
@@ -1495,7 +1520,16 @@ with t_pos:
             fmt = {'כמות': '{:,.4f}', 'יומי %': '{:+.2f}%', 'יומי $': '{:+,.0f}', 'שבוע %': '{:+.2f}%',
                    'חודש %': '{:+.2f}%', 'שווי $': '{:,.0f}', 'רווח/הפסד $': '{:+,.0f}',
                    'רווח/הפסד %': '{:+.2f}%', 'משקל %': '{:.1f}%'}
-            st.dataframe(styled_table(table, pct_cols, fmt), width='stretch', hide_index=True)
+            sorted_pos = sorted(positions, key=lambda x: x['value'], reverse=True)
+            with st.container(key='pos_table'):
+                st.dataframe(styled_table(table, pct_cols, fmt), width='stretch', hide_index=True)
+            with st.container(key='pos_cards'):
+                render_ledger([ledger_row(
+                    r['ticker'], f"{r['qty']:,.4g} יח׳ · משקל {r['weight']:.1f}%", money(r['price'], r['sym']),
+                    f"{pct(r['day_pct'])}  {signed_money(r['pl_1d'])}", tone(r['pl_1d']),
+                    pct(r['unreal_pct'], 1), tone(r['unreal']),
+                    caption=f"שווי {iso(money(r['value'], '$', 0))} · {iso(signed_money(r['unreal']))}")
+                    for r in sorted_pos])
             st.download_button("ייצוא CSV", table.to_csv(index=False).encode('utf-8-sig'), "portfolio.csv", "text/csv")
 
             alloc = {r['ticker']: r['value'] for r in positions}
