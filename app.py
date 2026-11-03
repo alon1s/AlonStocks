@@ -32,118 +32,183 @@ TZ = ZoneInfo("Asia/Jerusalem")
 RISK_FREE = 0.04
 
 # ==========================================
-# PAGE CONFIG + DESIGN SYSTEM
+# PAGE CONFIG + DESIGN SYSTEM (shadcn zinc tokens; base theme lives in .streamlit/config.toml)
 # ==========================================
 st.set_page_config(page_title="AlonStocks Pro", layout="wide", page_icon="◆", initial_sidebar_state="collapsed")
 
-INK, PANEL, LINE, TEXT, TEXT_DIM = '#0A0B0E', '#14161C', '#262A35', '#ECECEE', '#8B8F9C'
-GOLD, GAIN, LOSS, INFO = '#C9A24B', '#55A87F', '#C1584F', '#6B93BE'
+INK, PANEL, LINE, TEXT, TEXT_DIM = '#09090B', '#111113', '#27272A', '#FAFAFA', '#A1A1AA'
+GOLD, GAIN, LOSS, INFO = '#F59E0B', '#22C55E', '#EF4444', '#60A5FA'
+FONT = 'Geist, Heebo, sans-serif'
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap');
     :root {
-        --ink:#0A0B0E; --panel:#14161C; --panel-2:#1A1D25; --line:#262A35; --line-soft:#1C1F28;
-        --text:#ECECEE; --text-dim:#8B8F9C; --text-faint:#565A67;
-        --gold:#C9A24B; --gold-soft:rgba(201,162,75,0.12);
-        --gain:#55A87F; --loss:#C1584F; --info:#6B93BE;
+        --background:#09090B; --card:#111113; --muted:#18181B; --border:#27272A; --ring:#3F3F46;
+        --foreground:#FAFAFA; --muted-foreground:#A1A1AA; --faint:#71717A;
+        --gain:#22C55E; --loss:#EF4444; --warn:#F59E0B; --info:#60A5FA; --radius:12px;
     }
-    html, body, [class*="css"] { font-family:'Instrument Sans', sans-serif; }
-    .main, [data-testid="stAppViewContainer"] { background:var(--ink); }
+    .main .block-container, [data-testid="stMainBlockContainer"] { padding:3.4rem 1rem 112px !important; max-width:880px !important; }
     [data-testid="stHeader"] { background:transparent; }
-    input, select, textarea, button { font-size:16px !important; }
-    .main .block-container { padding:1.1rem 0.9rem 112px !important; max-width:100% !important; }
+    input, select, textarea { font-size:16px !important; }
+    * { font-variant-numeric:tabular-nums; }
 
-    [data-testid="stMarkdown"] p, [data-testid="stMarkdown"] li,
-    [data-testid="stMarkdown"] h1, [data-testid="stMarkdown"] h2, [data-testid="stMarkdown"] h3,
-    .stAlert p, [data-testid="stWidgetLabel"] p, [data-testid="stMetric"] label,
-    [data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span,
-    [data-testid="stFormSubmitButton"] button, [data-testid="stCaptionContainer"],
-    .section-title, .section-sub, .row-name, .row-sub, .row-caption, .stamp, .hero-label {
-        direction:rtl !important; text-align:right !important; unicode-bidi:embed !important;
+    /* RTL for text, LTR for numbers and charts */
+    [data-testid="stMarkdown"], .stAlert, [data-testid="stWidgetLabel"], [data-testid="stMetric"],
+    [data-testid="stExpander"] summary, [data-testid="stCaptionContainer"], [data-testid="stRadio"],
+    [data-testid="stCheckbox"], [data-testid="stForm"], [data-testid="stTextInput"], [data-testid="stNumberInput"],
+    [data-testid="stSelectbox"] { direction:rtl; text-align:right; }
+    [data-testid="stMetricValue"], [data-testid="stMetricDelta"], [data-testid="stDataFrame"],
+    [data-testid="stDataEditor"], .js-plotly-plot, .ltr, .num { direction:ltr !important; unicode-bidi:isolate; }
+    [data-testid="stNumberInput"] input { direction:ltr; text-align:right; }
+    [data-testid="stTextInput"] input { unicode-bidi:plaintext; text-align:right; }
+    [data-testid="stFormSubmitButton"], [data-testid="stButton"], [data-testid="stDownloadButton"] { width:100%; }
+    [data-testid="stMetricValue"] > div { text-align:right; }
+
+    /* Metric = shadcn Card */
+    [data-testid="stMetric"] { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px !important; }
+    [data-testid="stMetric"] label { color:var(--muted-foreground) !important; }
+    [data-testid="stMetric"] label p { font-size:0.78rem !important; }
+    [data-testid="stMetricValue"] { letter-spacing:-0.02em; }
+    [data-testid="stMetricDelta"] { justify-content:flex-start; }
+
+    /* Buttons = shadcn outline / default */
+    .stButton > button, .stDownloadButton > button {
+        min-height:42px; width:100%; font-weight:500; background:var(--background); color:var(--foreground);
+        border:1px solid var(--border); transition:background-color .15s, border-color .15s;
     }
-    [data-testid="stMetricValue"], [data-testid="stMetricDelta"], .stDataFrame, .stDataEditor,
-    .js-plotly-plot, pre, code, .row-ticker, .row-price, .hero-value {
-        direction:ltr !important; text-align:left !important;
+    .stButton > button:hover, .stDownloadButton > button:hover { background:var(--muted); border-color:var(--ring); color:var(--foreground); }
+    .stFormSubmitButton > button { min-height:42px; width:100%; font-weight:500; background:var(--foreground); color:var(--background);
+                                   border:1px solid var(--foreground); transition:background-color .15s; }
+    .stFormSubmitButton > button:hover { background:#D4D4D8; color:var(--background); border-color:#D4D4D8; }
+    [data-testid="stForm"] { background:var(--card); }
+    [data-testid="stExpander"] details { background:var(--card); }
+
+    /* Header */
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; direction:rtl; }
+    .wordmark {
+        font-weight:600; font-size:0.95rem; letter-spacing:-0.01em; direction:ltr;
+        background:linear-gradient(110deg, #71717A 35%, #FAFAFA 50%, #71717A 65%); background-size:250% 100%;
+        -webkit-background-clip:text; background-clip:text; color:transparent; animation:shine 6s linear infinite;
     }
+    @keyframes shine { from { background-position:100% 0; } to { background-position:-150% 0; } }
+    .live { display:inline-flex; align-items:center; gap:8px; font-size:0.74rem; color:var(--muted-foreground); }
+    .live-dot { position:relative; width:7px; height:7px; border-radius:50%; background:var(--gain); flex:none; }
+    .live-dot::after { content:''; position:absolute; inset:0; border-radius:50%; background:var(--gain); animation:ping 2s cubic-bezier(0,0,.2,1) infinite; }
+    .live-dot.closed { background:var(--faint); }
+    .live-dot.closed::after { display:none; }
+    @keyframes ping { 75%, 100% { transform:scale(2.6); opacity:0; } }
 
-    [data-testid="stMetric"] { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px !important; }
-    [data-testid="stMetric"] label { font-size:0.7rem !important; color:var(--text-dim) !important; font-weight:500; }
-    [data-testid="stMetricValue"] { font-size:1.2rem !important; font-weight:600 !important; font-family:'IBM Plex Mono', monospace !important; color:var(--text) !important; }
-    [data-testid="stMetricDelta"] { font-size:0.78rem !important; }
+    /* Hero */
+    .hero { direction:rtl; }
+    .hero-label { font-size:0.8rem; color:var(--muted-foreground); }
+    .hero-value { font-size:3rem; font-weight:600; letter-spacing:-0.045em; line-height:1.05; margin-top:4px;
+                  direction:ltr; text-align:right; animation:blurIn .8s cubic-bezier(.2,.7,.2,1) both; }
+    @keyframes blurIn { from { opacity:0; filter:blur(12px); transform:translateY(6px); } to { opacity:1; filter:none; transform:none; } }
+    .badges { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+    .badge { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:6px;
+             padding:3px 9px; font-size:0.76rem; color:var(--muted-foreground); background:var(--card); white-space:nowrap; }
+    .badge .num { font-weight:600; }
+    .stamp { font-size:0.74rem; color:var(--faint); margin-top:8px; direction:rtl; text-align:right; }
 
-    .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
-        min-height:46px !important; font-size:0.92rem !important; border-radius:7px !important; width:100% !important;
-        font-weight:600 !important; background:transparent !important; color:var(--gold) !important;
-        border:1px solid var(--gold) !important; transition:background 0.12s;
-    }
-    .stButton > button:hover, .stFormSubmitButton > button:hover { background:var(--gold-soft) !important; }
-    [data-testid="stTextInput"] input, [data-testid="stNumberInput"] input, [data-baseweb="select"] {
-        background:var(--panel) !important; border:1px solid var(--line) !important; color:var(--text) !important; border-radius:6px !important;
-    }
-    .stDataFrame { font-family:'IBM Plex Mono', monospace !important; font-size:0.75em; }
-    div[data-testid="stExpander"] { background:var(--panel); border:1px solid var(--line); border-radius:8px; margin-bottom:8px; }
+    /* Section headings */
+    .section-title { font-size:0.95rem; font-weight:600; color:var(--foreground); margin:30px 0 2px; direction:rtl; text-align:right; letter-spacing:-0.01em; }
+    .section-sub { font-size:0.78rem; color:var(--muted-foreground); margin:0 0 10px; direction:rtl; text-align:right; }
 
-    .hero-label { font-size:0.74rem; color:var(--text-dim); margin-bottom:2px; }
-    .hero-value { font-family:'Fraunces', serif; font-weight:500; font-size:2.5rem; color:var(--text); line-height:1.1; letter-spacing:-0.01em; }
-    .hero-change { font-family:'IBM Plex Mono', monospace; font-size:0.92rem; margin-top:4px; }
-    .stamp { font-size:0.72rem; color:var(--text-faint); margin-top:4px; }
+    /* List card */
+    .ledger { border:1px solid var(--border); border-radius:var(--radius); background:var(--card); overflow:hidden; margin-top:10px; }
+    .ledger-row { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr); align-items:center; gap:10px;
+                  padding:12px 14px; border-bottom:1px solid var(--border); direction:rtl; transition:background-color .15s; }
+    .ledger-row:last-child { border-bottom:none; }
+    .ledger-row:hover { background:var(--muted); }
+    .ledger-row.total { background:var(--muted); }
+    .row-ticker { font-weight:600; font-size:0.95rem; direction:ltr; unicode-bidi:isolate; }
+    .row-name { font-size:0.72rem; color:var(--muted-foreground); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .row-name.latin { direction:ltr; text-align:right; }
+    .row-mid { text-align:center; }
+    .row-price { font-weight:500; font-size:0.9rem; direction:ltr; }
+    .row-sub { font-size:0.75rem; margin-top:2px; direction:ltr; }
+    .row-end { text-align:left; }
+    .row-tag { font-size:0.9rem; font-weight:600; direction:ltr; }
+    .row-caption { font-size:0.7rem; color:var(--faint); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-    .section-title { font-size:0.82rem; font-weight:600; color:var(--text); border-right:3px solid var(--gold); padding:3px 10px 3px 0; margin:22px 0 10px; }
-    .section-sub { font-size:0.72rem; color:var(--text-faint); margin:-6px 0 12px; padding-right:13px; }
+    /* Attention items (shadcn Alert) */
+    .attn-strip { display:flex; gap:12px; align-items:stretch; border:1px solid var(--border); border-radius:10px;
+                  background:var(--card); padding:10px 12px; margin-bottom:6px; direction:rtl; }
+    .attn-strip .bar { width:3px; border-radius:2px; flex:none; }
+    .ledger .attn-strip { border:none; border-radius:0; margin:0; border-bottom:1px solid var(--border); }
+    .ledger .attn-strip:last-child { border-bottom:none; }
+    .attn-strip .row-name { color:var(--muted-foreground); font-size:0.8rem; white-space:normal; }
 
-    .ledger-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:12px 4px; border-bottom:1px solid var(--line-soft); }
-    .ledger-row.total { border-top:1px solid var(--line); border-bottom:none; }
-    .row-ticker { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:0.98rem; color:var(--text); }
-    .row-name { font-size:0.68rem; color:var(--text-faint); margin-top:2px; }
-    .row-price { font-family:'IBM Plex Mono', monospace; font-weight:600; font-size:0.9rem; color:var(--text); }
-    .row-sub { font-family:'IBM Plex Mono', monospace; font-size:0.76rem; margin-top:2px; direction:ltr !important; text-align:center !important; }
-    .row-tag { font-size:0.8rem; font-weight:600; display:flex; align-items:center; gap:5px; justify-content:flex-end; font-family:'IBM Plex Mono', monospace; }
-    .row-caption { font-size:0.66rem; color:var(--text-faint); margin-top:2px; max-width:240px; }
-    .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+    /* Stat strip */
+    .idx-strip { display:grid; grid-template-columns:repeat(auto-fit, minmax(104px, 1fr)); border:1px solid var(--border);
+                 border-radius:var(--radius); overflow:hidden; background:var(--card); margin:14px 0 4px; direction:rtl; }
+    .idx-item { padding:10px 12px; box-shadow:-1px 0 0 var(--border), 0 1px 0 var(--border); }
+    .idx-name { font-size:0.7rem; color:var(--muted-foreground); }
+    .idx-price { font-size:0.88rem; font-weight:600; margin-top:2px; direction:ltr; text-align:right; }
+    .idx-chg { font-size:0.72rem; margin-top:1px; direction:ltr; text-align:right; }
 
-    .attn-strip { border-right:3px solid var(--gold); background:var(--panel); border-radius:6px; padding:10px 12px; margin-bottom:8px; }
-    .attn-strip .row-name { color:var(--text-dim); font-size:0.74rem; }
+    .range-wrap { direction:ltr; margin:6px 0 14px; }
+    .range-bar { height:6px; border-radius:3px; background:var(--muted); position:relative; margin:8px 0 6px; }
+    .range-fill { position:absolute; top:0; bottom:0; left:0; border-radius:3px; background:linear-gradient(90deg, #3F3F46, #A1A1AA); }
+    .range-marker { position:absolute; top:-4px; width:14px; height:14px; border-radius:50%; background:var(--foreground);
+                    border:3px solid var(--background); transform:translateX(-50%); }
+    .range-labels { display:flex; justify-content:space-between; font-size:0.72rem; color:var(--faint); }
 
-    .idx-strip { display:flex; flex-wrap:wrap; margin-bottom:14px; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-    .idx-item { flex:1; min-width:90px; padding:10px 12px; border-left:1px solid var(--line); }
-    .idx-item:last-child { border-left:none; }
-    .idx-name { font-size:0.64rem; color:var(--text-faint); }
-    .idx-price { font-family:'IBM Plex Mono', monospace; font-size:0.86rem; font-weight:600; color:var(--text); margin-top:2px; direction:ltr; }
-    .idx-chg { font-family:'IBM Plex Mono', monospace; font-size:0.7rem; margin-top:1px; direction:ltr; }
+    .news-item { padding:12px 14px; border-bottom:1px solid var(--border); direction:rtl; }
+    .news-item:last-child { border-bottom:none; }
+    .news-title { font-size:0.86rem; unicode-bidi:plaintext; }
+    .news-title a { color:var(--foreground); text-decoration:none; }
+    .news-title a:hover { text-decoration:underline; }
+    .news-meta { font-size:0.7rem; color:var(--faint); margin-top:4px; }
+    .chip { display:inline-block; border:1px solid var(--border); border-radius:6px; padding:0 6px; font-size:0.68rem;
+            color:var(--muted-foreground); margin-inline-start:6px; direction:ltr; unicode-bidi:isolate; }
 
-    .range-wrap { direction:ltr; margin:2px 0 14px; }
-    .range-bar { height:4px; border-radius:2px; background:linear-gradient(90deg,#C1584F,#C9A24B,#55A87F); position:relative; margin:8px 0 4px; }
-    .range-marker { position:absolute; top:-4px; width:12px; height:12px; border-radius:50%; background:var(--text); border:2px solid var(--ink); transform:translateX(-50%); }
-    .range-labels { display:flex; justify-content:space-between; font-family:'IBM Plex Mono', monospace; font-size:0.68rem; color:var(--text-faint); }
+    @media (prefers-reduced-motion: reduce) { .wordmark, .live-dot::after, .hero-value { animation:none; } }
 
-    .news-item { padding:10px 4px; border-bottom:1px solid var(--line-soft); }
-    .news-title { font-size:0.84rem; color:var(--text); }
-    .news-meta { font-size:0.66rem; color:var(--text-faint); margin-top:3px; font-family:'IBM Plex Mono', monospace; }
+    [data-testid="stButtonGroup"] { overflow-x:auto; scrollbar-width:none; }
+    [data-testid="stButtonGroup"] button p { font-size:0.82rem; }
 
+    /* Keep columns side by side on phones (2x2 metric grids, inline form fields) */
+    [data-testid="stHorizontalBlock"] { flex-wrap:nowrap !important; gap:10px !important; direction:rtl; }
+    [data-testid="stColumn"], [data-testid="column"] { min-width:0 !important; }
+
+    /* Top-level tabs: underline style on desktop, frosted bottom nav on phones. Nested tabs stay inline. */
+    [data-testid="stTabs"] [role="tablist"] { direction:rtl; }
+    [data-testid="stTab"] p { font-size:0.9rem; }
     @media (max-width: 900px) {
-        [data-testid="stTabs"] > div:first-child > div[data-baseweb="tab-list"] {
-            position:fixed !important; bottom:0 !important; left:0 !important; right:0 !important; top:auto !important;
-            z-index:9999 !important; background:var(--panel) !important; border-top:1px solid var(--line) !important;
-            padding:8px 4px env(safe-area-inset-bottom, 10px) !important; margin:0 !important;
-            display:flex !important; justify-content:space-around !important; box-shadow:0 -8px 24px rgba(0,0,0,0.4) !important;
-            gap:0 !important; overflow-x:visible !important;
+        [data-testid="stTabs"] [role="tablist"] {
+            position:fixed !important; bottom:0 !important; left:0 !important; right:0 !important; top:auto !important; z-index:999 !important;
+            background:rgba(9,9,11,.88) !important; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+            border-top:1px solid var(--border) !important; padding:4px 2px calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
+            margin:0 !important; display:flex !important; justify-content:space-around !important; gap:0 !important; overflow:visible !important;
         }
-        [data-testid="stTabs"] > div:first-child div[data-baseweb="tab"] {
-            flex:1 !important; justify-content:center !important; padding:4px 2px !important; font-size:0.66rem !important;
-            white-space:normal !important; text-align:center !important; line-height:1.25 !important;
-            border-bottom:none !important; min-width:0 !important; color:var(--text-dim) !important;
+        [data-testid="stTabs"] [role="tablist"] > [role="tab"] {
+            flex:1 1 0 !important; min-width:0 !important; justify-content:center !important; padding:10px 2px !important; margin:0 !important;
+            color:var(--muted-foreground) !important; border:none !important;
         }
-        [data-testid="stTabs"] > div:first-child div[aria-selected="true"][data-baseweb="tab"] {
-            color:var(--gold) !important; border-bottom:2px solid var(--gold) !important;
+        [data-testid="stTabs"] [role="tablist"] > [role="tab"] p { font-size:0.72rem !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        [data-testid="stTabs"] [role="tablist"] > [role="tab"][aria-selected="true"] { color:var(--foreground) !important; }
+        [data-testid="stTabs"] [role="tablist"] > [role="tab"][aria-selected="true"] p { font-weight:600; }
+        [data-testid="stTabs"] [role="tablist"] > [role="tab"] > div:not([data-testid]),
+        [data-testid="stTabs"] [role="tablist"] > div[data-baseweb="tab-highlight"],
+        [data-testid="stTabs"] [role="tablist"] > div[data-baseweb="tab-border"] { display:none !important; }
+
+        [data-testid="stTabPanel"] [data-testid="stTabs"] [role="tablist"], [role="tabpanel"] [data-testid="stTabs"] [role="tablist"] {
+            position:static !important; background:transparent !important; backdrop-filter:none; -webkit-backdrop-filter:none;
+            border-top:none !important; border-bottom:1px solid var(--border) !important; padding:0 !important;
+            justify-content:flex-start !important; overflow-x:auto !important; gap:4px !important;
         }
-        [data-testid="stTabs"] [data-testid="stTabs"] div[data-baseweb="tab-list"] {
-            position:static !important; box-shadow:none !important; border-top:none !important;
-            padding:0 !important; justify-content:flex-start !important; overflow-x:auto !important; gap:2px !important;
+        [data-testid="stTabPanel"] [data-testid="stTabs"] [role="tablist"] > [role="tab"], [role="tabpanel"] [data-testid="stTabs"] [role="tablist"] > [role="tab"] {
+            flex:none !important; padding:8px 10px !important;
         }
-        [data-testid="stTabs"] > div > div[data-baseweb="tab-panel"] { padding-bottom:92px !important; }
-        [data-testid="stTabs"] [data-testid="stTabs"] div[data-baseweb="tab"] { padding:6px 10px !important; font-size:0.76rem !important; }
-        .hero-value { font-size:2.1rem; }
+        [data-testid="stTabPanel"] [data-testid="stTabs"] [role="tablist"] > [role="tab"][aria-selected="true"],
+        [role="tabpanel"] [data-testid="stTabs"] [role="tablist"] > [role="tab"][aria-selected="true"] { box-shadow:inset 0 -2px 0 var(--foreground); }
+        [data-testid="stTabPanel"] [data-testid="stTabs"] [role="tablist"] > [role="tab"] p { font-size:0.8rem !important; }
+
+        [data-testid="stMetric"] { padding:12px 12px !important; }
+        [data-testid="stMetricValue"] { font-size:1.15rem !important; }
+        .hero-value { font-size:2.6rem; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -154,10 +219,11 @@ SIGNAL_LABEL_HE = {'STRONG BUY': 'קנייה חזקה', 'BUY': 'קנייה', 'WA
                    'SELL': 'מכירה', 'STRONG SELL': 'מכירה חזקה', 'AVOID': 'הימנע'}
 DAYS_HE = ['שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת', 'ראשון']
 PERIODS = {"יום": "1d", "שבוע": "1w", "חודש": "1m", "מתחילת השנה": "ytd"}
-CHART_BARS = {"חודש": 21, "3 חודשים": 63, "6 חודשים": 126, "שנה": 252, "שנתיים": 504}
+CHART_BARS = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "2Y": 504}
 
-MARKET_TICKERS = {'SPY': ('S&P 500', '$'), 'QQQ': ('NASDAQ 100', '$'), '^VIX': ('VIX', ''),
-                  'USDILS=X': ('דולר/שקל', '₪'), 'GLD': ('זהב', '$'), 'BTC-USD': ('ביטקוין', '$')}
+MARKET_TICKERS = {'SPY': ('S&P 500', '$'), 'QQQ': ('NASDAQ 100', '$'), 'TA35.TA': ('ת״א 35', ''),
+                  '^VIX': ('VIX', ''), 'USDILS=X': ('דולר/שקל', '₪'), 'GLD': ('זהב', '$')}
+TASE_INDICES = {'TA35.TA', 'TA90.TA', 'TA125.TA', '^TA125.TA'}  # index points, not agorot
 
 INFO_KEYS = ['longName', 'shortName', 'sector', 'quoteType', 'currency', 'trailingPE', 'forwardPE',
              'pegRatio', 'beta', 'marketCap', 'dividendRate', 'revenueGrowth', 'earningsGrowth',
@@ -170,6 +236,22 @@ NASDAQ_100 = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'META', 'GOOGL', 'TSLA', 'AVGO', '
               'PANW', 'SNPS', 'CDNS', 'MELI', 'CRWD', 'FTNT', 'PCAR', 'ORLY', 'CTAS', 'NXPI']
 TA35_TICKERS = ['TEVA.TA', 'ICL.TA', 'NICE.TA', 'ESLT.TA', 'BEZQ.TA', 'LUMI.TA', 'HARL.TA', 'POLI.TA',
                 'DSCT.TA', 'PHOE.TA', 'AZRG.TA', 'ELAL.TA', 'MZTF.TA', 'MGDL.TA', 'NVMI.TA', 'TSEM.TA']
+
+# Hebrew (and common English) names for TASE stocks -> Yahoo symbol. Anything else resolves through Yahoo search.
+TASE_NAMES = {
+    'לאומי': 'LUMI.TA', 'בנק לאומי': 'LUMI.TA', 'הפועלים': 'POLI.TA', 'בנק הפועלים': 'POLI.TA',
+    'דיסקונט': 'DSCT.TA', 'מזרחי': 'MZTF.TA', 'מזרחי טפחות': 'MZTF.TA', 'הבינלאומי': 'FIBI.TA',
+    'טבע': 'TEVA.TA', 'אלביט': 'ESLT.TA', 'אלביט מערכות': 'ESLT.TA', 'נייס': 'NICE.TA', 'כיל': 'ICL.TA',
+    'בזק': 'BEZQ.TA', 'אל על': 'ELAL.TA', 'עזריאלי': 'AZRG.TA', 'הפניקס': 'PHOE.TA', 'הראל': 'HARL.TA',
+    'מגדל': 'MGDL.TA', 'כלל ביטוח': 'CLIS.TA', 'מנורה': 'MMHD.TA', 'מנורה מבטחים': 'MMHD.TA',
+    'נובה': 'NVMI.TA', 'טאואר': 'TSEM.TA', 'בזן': 'ORL.TA', 'דלק': 'DLEKG.TA', 'קבוצת דלק': 'DLEKG.TA',
+    'ניו מד': 'NWMD.TA', 'אנלייט': 'ENLT.TA', 'אורמת': 'ORA.TA', 'שופרסל': 'SAE.TA', 'שטראוס': 'STRS.TA',
+    'ביג': 'BIG.TA', 'אמות': 'AMOT.TA', 'מליסרון': 'MLSR.TA', 'אלוני חץ': 'ALHE.TA', 'שיכון ובינוי': 'SKBN.TA',
+    'קמטק': 'CAMT.TA', 'מטריקס': 'MTRX.TA', 'ישראכרט': 'ISCD.TA', 'אנרג׳יאן': 'ENOG.TA', 'שפיר': 'SPEN.TA',
+    'פתאל': 'FTAL.TA', 'אלקו': 'ELCO.TA', 'קנון': 'KEN.TA', 'פורמולה': 'FORTY.TA', 'נקסט ויז׳ן': 'NXSN.TA',
+    'ת״א 35': 'TA35.TA', 'תא 35': 'TA35.TA',
+}
+HEBREW = re.compile(r'[\u0590-\u05FF]')
 SCAN_UNIVERSES = {
     "Mega caps": ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'META', 'GOOGL', 'NFLX', 'AMD', 'AVGO',
                   'COST', 'JPM', 'V', 'MA', 'LLY', 'UNH', 'WMT', 'XOM'],
@@ -200,10 +282,16 @@ def money(v, sym='$', dec=2):
     return f"{'-' if v < 0 else ''}{sym}{abs(v):,.{dec}f}"
 
 def signed_money(v, sym='$', dec=0):
-    return f"{'+' if v >= 0 else '-'}{sym}{abs(v):,.{dec}f}"
+    if round(abs(v), dec) == 0:
+        return f"{sym}{0:,.{dec}f}"
+    return f"{'+' if v > 0 else '-'}{sym}{abs(v):,.{dec}f}"
 
 def pct(v, dec=2):
     return f"{v:+.{dec}f}%"
+
+def iso(x):
+    """Bidi-isolate a number inside Hebrew text so signs and symbols stay in place."""
+    return f'\u2066{x}\u2069'
 
 def tone(v):
     return GAIN if v >= 0 else LOSS
@@ -400,7 +488,7 @@ def download_history(tickers, period='2y'):
                 continue
             if h.index.tz is not None:
                 h.index = h.index.tz_localize(None)
-            if is_ils(t) and not t.startswith('^'):
+            if is_ils(t) and t not in TASE_INDICES:
                 h[OHLC] = h[OHLC] / 100
             h['Volume'] = h['Volume'].fillna(0)
             out[t] = h
@@ -771,12 +859,111 @@ def risk_analytics(tickers, hists):
     corr = rets[cols].corr() if len(cols) > 1 else None
     return pd.DataFrame(rows), corr
 
-def parse_tickers(text, limit=25):
+def _norm_he(text):
+    text = text.replace("'", '׳').replace('"', '״').replace('בע״מ', '')
+    return re.sub(r'\s+', ' ', text).strip()
+
+TASE_NAMES_NORM = {_norm_he(k): v for k, v in TASE_NAMES.items()}
+TICKER_RE = re.compile(r'[A-Z0-9.\-^=]{1,15}')
+
+def can_be_tase(t):
+    return '.' not in t and '=' not in t and not t.startswith('^') and not t.endswith('-USD')
+
+def match_hebrew(text):
+    """Hebrew company name -> TASE symbol, or None if unknown/ambiguous."""
+    q = _norm_he(text)
+    if q in TASE_NAMES_NORM:
+        return TASE_NAMES_NORM[q]
+    hits = {v for k, v in TASE_NAMES_NORM.items() if q in k or k in q}
+    return hits.pop() if len(hits) == 1 else None
+
+def resolve_token(tok, market='auto'):
+    """market: 'auto' (as typed), 'us', or 'ta' (append .TA)."""
+    tok = tok.strip()
+    if not tok:
+        return None
+    if HEBREW.search(tok):
+        return match_hebrew(tok)
+    t = tok.upper()
+    if not TICKER_RE.fullmatch(t):
+        return None
+    if market == 'ta' and can_be_tase(t):
+        t += '.TA'
+    return t
+
+def parse_tickers(text, market='auto', limit=25):
+    """Returns (symbols, unrecognized). Commas/newlines separate entries; Latin entries may also be space-separated."""
+    out, bad = [], []
+    for chunk in re.split(r'[,;\n]+', text or ''):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        for part in ([chunk] if HEBREW.search(chunk) else chunk.split()):
+            sym = resolve_token(part, market)
+            if sym is None:
+                bad.append(part)
+            elif sym not in out:
+                out.append(sym)
+    return out[:limit], bad
+
+def load_with_fallback(symbols, market='auto'):
+    """Loads symbols; in auto mode, a bare symbol with no US data is retried on TASE (SYMBOL.TA)."""
+    hists, snaps = load_market(tuple(sorted(symbols)), True)
+    retry = {t: f"{t}.TA" for t in symbols if t not in snaps and market == 'auto' and can_be_tase(t)}
+    if retry:
+        h2, s2 = load_market(tuple(sorted(retry.values())), True)
+        hists, snaps = {**hists, **h2}, {**snaps, **s2}
+    resolved, bad = [], []
+    for t in symbols:
+        sym = t if t in snaps else retry.get(t)
+        if sym in snaps:
+            if sym not in resolved:
+                resolved.append(sym)
+        else:
+            bad.append(t)
+    return hists, snaps, resolved, bad
+
+def resolve_single(text, market='auto'):
+    """Returns (symbol, last_price). last_price is None when no market data exists for the symbol."""
+    syms, _ = parse_tickers(text, market, 1)
+    if not syms:
+        return None, None
+    t = syms[0]
+    for cand in [t] + ([f"{t}.TA"] if market == 'auto' and can_be_tase(t) else []):
+        h = download_history((cand,), '1mo').get(cand)
+        if h is not None:
+            return cand, float(h['Close'].iloc[-1])
+    return t, None
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def search_symbols(query, tase_only=False):
+    """Company-name lookup. Hebrew queries use the built-in TASE list; others use Yahoo search."""
+    q = (query or '').strip()
+    if not q:
+        return []
+    if HEBREW.search(q):
+        qn, seen, out = _norm_he(q), set(), []
+        for k, v in TASE_NAMES_NORM.items():
+            if (qn in k or k in qn) and v not in seen:
+                seen.add(v)
+                out.append({'symbol': v, 'name': k, 'exchange': 'בורסת ת״א'})
+        return out
+    try:
+        quotes = yf.Search(q, max_results=10, news_count=0, lists_count=0, raise_errors=False).quotes or []
+    except Exception:
+        quotes = []
     out = []
-    for tok in re.split(r'[\s,;]+', (text or '').upper()):
-        if re.fullmatch(r'[A-Z0-9.\-^=]{1,15}', tok) and tok not in out:
-            out.append(tok)
-    return out[:limit]
+    for x in quotes:
+        sym = x.get('symbol')
+        if not sym or x.get('quoteType') not in ('EQUITY', 'ETF', 'MUTUALFUND', 'INDEX'):
+            continue
+        if tase_only and not sym.endswith('.TA'):
+            continue
+        out.append({'symbol': sym, 'name': x.get('longname') or x.get('shortname') or sym,
+                    'exchange': 'בורסת ת״א' if sym.endswith('.TA') else (x.get('exchDisp') or x.get('exchange') or '')})
+    return out
+
+MARKET_OPTIONS = {'auto': 'זיהוי אוטומטי', 'us': 'ארה״ב', 'ta': 'בורסת ת״א'}
 
 # ==========================================
 # SCREENSHOT IMPORT (best-effort OCR)
@@ -818,21 +1005,32 @@ def section(title, subtitle=None):
     if subtitle:
         st.markdown(f'<div class="section-sub">{esc(subtitle)}</div>', unsafe_allow_html=True)
 
+def exchange_label(t):
+    return 'ת״א' if is_ils(t) else None
+
 def ledger_row(ticker, subtitle, price_str, sub_str, sub_color, tag_text, tag_color, caption=None, total=False):
     cap = f'<div class="row-caption">{esc(caption)}</div>' if caption else ''
+    chip = f'<span class="chip">{exchange_label(ticker)}</span>' if exchange_label(ticker) else ''
+    name_dir = '' if HEBREW.search(str(subtitle)) else ' latin'
     return (f'<div class="ledger-row{" total" if total else ""}">'
-            f'<div><div class="row-ticker">{esc(ticker)}</div><div class="row-name">{esc(subtitle)}</div></div>'
-            f'<div style="text-align:center"><div class="row-price">{esc(price_str)}</div>'
+            f'<div><div><span class="row-ticker">{esc(ticker)}</span>{chip}</div><div class="row-name{name_dir}">{esc(subtitle)}</div></div>'
+            f'<div class="row-mid"><div class="row-price">{esc(price_str)}</div>'
             f'<div class="row-sub" style="color:{sub_color}">{esc(sub_str)}</div></div>'
-            f'<div style="text-align:right"><div class="row-tag" style="color:{tag_color}">'
-            f'<span class="dot" style="background:{tag_color}"></span>{esc(tag_text)}</div>{cap}</div></div>')
+            f'<div class="row-end"><div class="row-tag" style="color:{tag_color}">{esc(tag_text)}</div>{cap}</div></div>')
 
 def render_ledger(rows_html):
-    st.markdown('<div>' + ''.join(rows_html) + '</div>', unsafe_allow_html=True)
+    if rows_html:
+        st.markdown('<div class="ledger">' + ''.join(rows_html) + '</div>', unsafe_allow_html=True)
 
 def attn(ticker, msg, color=GOLD):
-    st.markdown(f'<div class="attn-strip" style="border-color:{color}"><div class="row-ticker">{esc(ticker)}</div>'
-                f'<div class="row-name">{esc(msg)}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="attn-strip"><span class="bar" style="background:{color}"></span>'
+                f'<div><div class="row-ticker">{esc(ticker)}</div><div class="row-name">{esc(msg)}</div></div></div>',
+                unsafe_allow_html=True)
+
+def attn_list(items):
+    rows = ''.join(f'<div class="attn-strip"><span class="bar" style="background:{c}"></span>'
+                   f'<div><div class="row-ticker">{esc(t)}</div><div class="row-name">{esc(m)}</div></div></div>' for t, m, c in items)
+    st.markdown(f'<div class="ledger">{rows}</div>', unsafe_allow_html=True)
 
 def strip(items):
     """items: (label, value, sub, color) — color applies to sub, or to value when sub is empty."""
@@ -846,8 +1044,9 @@ def strip(items):
 
 def range_bar(lo, hi, price, sym):
     pos = 50.0 if hi <= lo else min(100.0, max(0.0, (price - lo) / (hi - lo) * 100))
-    st.markdown('<div class="hero-label">טווח 52 שבועות</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="range-wrap"><div class="range-bar"><div class="range-marker" style="left:{pos:.1f}%"></div></div>'
+    st.markdown(f'<div class="section-sub" style="margin:14px 0 0">טווח 52 שבועות · {pos:.0f}% מהשפל לשיא</div>'
+                f'<div class="range-wrap"><div class="range-bar"><div class="range-fill" style="width:{pos:.1f}%"></div>'
+                f'<div class="range-marker" style="left:{pos:.1f}%"></div></div>'
                 f'<div class="range-labels"><span>{esc(money(lo, sym))}</span><span>{esc(money(hi, sym))}</span></div></div>',
                 unsafe_allow_html=True)
 
@@ -859,55 +1058,83 @@ def render_news(items):
     for n in items:
         title = esc(n['title'])
         if n['url'].startswith('http'):
-            title = f'<a href="{esc(n["url"])}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none">{title}</a>'
+            title = f'<a href="{esc(n["url"])}" target="_blank" rel="noopener">{title}</a>'
         when = n['ts'].strftime('%d.%m %H:%M') if n['ts'] is not None else ''
+        meta = ' · '.join(x for x in (esc(n['publisher']), esc(when)) if x)
         out.append(f'<div class="news-item"><div class="news-title">{title}</div>'
-                   f'<div class="news-meta">{esc(n["ticker"])} · {esc(n["publisher"])} · {esc(when)}</div></div>')
-    st.markdown(''.join(out), unsafe_allow_html=True)
+                   f'<div class="news-meta"><span class="chip" style="margin:0 0 0 6px">{esc(n["ticker"])}</span>{meta}</div></div>')
+    st.markdown('<div class="ledger">' + ''.join(out) + '</div>', unsafe_allow_html=True)
 
 def dark_layout(fig, height):
-    fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor=PANEL, font_color=TEXT,
-                      margin=dict(l=10, r=10, t=10, b=10))
-    fig.update_xaxes(gridcolor=LINE)
-    fig.update_yaxes(gridcolor=LINE)
+    fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                      font=dict(family=FONT, color=TEXT_DIM, size=11), margin=dict(l=6, r=6, t=8, b=6),
+                      hoverlabel=dict(bgcolor=PANEL, bordercolor=LINE, font=dict(family=FONT, color=TEXT, size=12)))
+    fig.update_xaxes(gridcolor='rgba(39,39,42,0.6)', zeroline=False, linecolor=LINE, showline=False)
+    fig.update_yaxes(gridcolor='rgba(39,39,42,0.6)', zeroline=False)
     return fig
 
-def price_chart(hist, bars, cost=None, sym='$', skip_weekends=True):
-    smas = {p: hist['Close'].rolling(p).mean().iloc[-bars:] for p in (20, 50, 200)}
+def hex_rgba(hex_color, alpha):
+    h = hex_color.lstrip('#')
+    return f"rgba({int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)},{alpha})"
+
+def price_chart(hist, bars, cost=None, sym='$', candles=False):
+    """Category x-axis: plots only real trading days, whatever the exchange calendar."""
+    sma = {p: hist['Close'].rolling(p).mean().iloc[-bars:] for p in (50, 200)}
     h = hist.iloc[-bars:]
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.78, 0.22], vertical_spacing=0.03)
-    fig.add_trace(go.Candlestick(x=h.index, open=h['Open'], high=h['High'], low=h['Low'], close=h['Close'],
-                                 name='מחיר', showlegend=False,
-                                 increasing_line_color=GAIN, decreasing_line_color=LOSS), row=1, col=1)
-    for p, color in ((20, GOLD), (50, INFO), (200, LOSS)):
-        if smas[p].notna().any():
-            fig.add_trace(go.Scatter(x=smas[p].index, y=smas[p], name=f'SMA{p}', line=dict(color=color, width=1.3)), row=1, col=1)
+    x = h.index.strftime('%d.%m.%y')
+    color = tone(h['Close'].iloc[-1] - h['Close'].iloc[0])
+    lows = [float(h['Low' if candles else 'Close'].min())] + [float(v.min()) for v in sma.values() if v.notna().any()]
+    highs = [float(h['High' if candles else 'Close'].max())] + [float(v.max()) for v in sma.values() if v.notna().any()]
     if cost:
-        fig.add_hline(y=cost, line_dash='dash', line_color=TEXT_DIM, row=1, col=1,
-                      annotation_text=f'מחיר קנייה {sym}{cost:,.2f}', annotation_position='top left')
-    fig.add_trace(go.Bar(x=h.index, y=h['Volume'], name='נפח', showlegend=False,
-                         marker_color='rgba(107,147,190,0.35)'), row=2, col=1)
-    dark_layout(fig, 460)
-    fig.update_layout(legend=dict(orientation='h', y=1.05, font=dict(size=10)))
-    fig.update_xaxes(rangeslider_visible=False)
-    if skip_weekends:
-        fig.update_xaxes(rangebreaks=[dict(bounds=['sat', 'mon'])])
+        lows.append(cost); highs.append(cost)
+    pad = (max(highs) - min(lows)) * 0.06 or max(highs) * 0.02
+    floor, ceil = min(lows) - pad, max(highs) + pad
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.8, 0.2], vertical_spacing=0.04)
+    if candles:
+        fig.add_trace(go.Candlestick(x=x, open=h['Open'], high=h['High'], low=h['Low'], close=h['Close'], name='מחיר',
+                                     showlegend=False, increasing_line_color=GAIN, decreasing_line_color=LOSS,
+                                     increasing_fillcolor=GAIN, decreasing_fillcolor=LOSS), row=1, col=1)
+    else:
+        fig.add_trace(go.Scatter(x=x, y=[floor] * len(h), line=dict(width=0), hoverinfo='skip', showlegend=False), row=1, col=1)
+        fig.add_trace(go.Scatter(x=x, y=h['Close'], name='מחיר', showlegend=False, fill='tonexty',
+                                 fillcolor=hex_rgba(color, 0.10), line=dict(color=color, width=2),
+                                 hovertemplate=f'{sym}%{{y:,.2f}}<extra></extra>'), row=1, col=1)
+    for p, c in ((50, INFO), (200, GOLD)):
+        if sma[p].notna().any():
+            fig.add_trace(go.Scatter(x=x, y=sma[p].values, name=f'ממוצע {p}', line=dict(color=c, width=1.1, dash='dot'),
+                                     hovertemplate=f'SMA{p} {sym}%{{y:,.2f}}<extra></extra>'), row=1, col=1)
+    if cost:
+        fig.add_hline(y=cost, line_dash='dash', line_color=TEXT_DIM, line_width=1, row=1, col=1,
+                      annotation_text=f'מחיר קנייה {sym}{cost:,.2f}', annotation_position='top left',
+                      annotation_font=dict(color=TEXT_DIM, size=11))
+    fig.add_trace(go.Bar(x=x, y=h['Volume'], name='נפח', showlegend=False, marker_color='rgba(161,161,170,0.28)',
+                         hovertemplate='%{y:,.0f}<extra>נפח</extra>'), row=2, col=1)
+    dark_layout(fig, 440)
+    fig.update_layout(hovermode='x unified', bargap=0.25,
+                      legend=dict(orientation='h', y=1.06, x=1, xanchor='right', font=dict(size=11)))
+    fig.update_xaxes(type='category', nticks=6, rangeslider_visible=False, showgrid=False)
+    fig.update_yaxes(range=[floor, ceil], row=1, col=1)
+    fig.update_yaxes(showgrid=False, showticklabels=False, row=2, col=1)
     return fig
 
 def render_stock_detail(t, s, hist, pos=None, key='detail'):
     sym = s['sym']
-    st.markdown(f'<div class="row-ticker" style="font-size:1.35rem">{esc(t)}</div>'
-                f'<div class="row-name">{esc(s["name"])} · {esc(s["sector"])}</div>'
-                f'<div class="stamp">נכון לסגירה/מחיר אחרון של {s["last_date"]:%d.%m.%Y}</div>', unsafe_allow_html=True)
+    chip = f'<span class="chip">{exchange_label(t)}</span>' if exchange_label(t) else ''
+    sector = f" · {s['sector']}" if s['sector'] and s['sector'] != '—' else ''
+    st.markdown(f'<div class="hero" style="margin-top:6px"><div><span class="row-ticker" style="font-size:1.4rem">{esc(t)}</span>{chip}</div>'
+                f'<div class="row-name" style="font-size:0.8rem">{esc(s["name"])}{esc(sector)}</div>'
+                f'<div class="stamp">מחיר אחרון מ-{s["last_date"]:%d.%m.%Y}{" · מחירים בשקלים" if is_ils(t) else ""}</div></div>',
+                unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     c1.metric("מחיר", money(s['price'], sym), f"{pct(s['rets']['1d'])} ({signed_money(s['day_chg'], sym, 2)})")
     if pos:
-        c2.metric("שווי הפוזיציה", money(pos['value']), f"{signed_money(pos['pl_1d'])} היום")
+        c2.metric("שווי הפוזיציה", money(pos['value']), f"{signed_money(pos['pl_1d'])} היום",
+                  delta_color='normal' if round(pos['pl_1d']) else 'off', delta_arrow='auto' if round(pos['pl_1d']) else 'off')
         c3, c4 = st.columns(2)
         c3.metric("רווח/הפסד מאז הקנייה", signed_money(pos['unreal']), pct(pos['unreal_pct']))
         c4.metric("מחיר קנייה ממוצע", money(pos['avg'], sym),
-                  f"{fmt_qty(pos['qty'])} יח' · {pos['weight']:.1f}% מהתיק", delta_color='off')
+                  f"{iso(fmt_qty(pos['qty']))} יח׳ · {iso(format(pos['weight'], '.1f') + '%')} מהתיק", delta_color='off', delta_arrow='off')
     else:
         c2.metric("מתחילת השנה", pct(s['rets']['ytd']), signed_money(s['price'] - s['bases']['ytd'], sym, 2))
 
@@ -915,9 +1142,12 @@ def render_stock_detail(t, s, hist, pos=None, key='detail'):
            (("יום", '1d'), ("שבוע", '1w'), ("חודש", '1m'), ("3 חודשים", '3m'), ("מתחילת שנה", 'ytd'), ("שנה", '1y'))])
     range_bar(s['lo52'], s['hi52'], s['price'], sym)
 
-    period = st.radio("טווח גרף", list(CHART_BARS), index=2, horizontal=True, key=f'{key}_period_{t}')
-    weekend_trading = is_ils(t) or s['quote_type'] == 'CRYPTOCURRENCY' or t.endswith('-USD')
-    st.plotly_chart(price_chart(hist, CHART_BARS[period], pos['avg'] if pos else None, sym, not weekend_trading),
+    g1, g2 = st.columns([5, 3])
+    period = g1.segmented_control("טווח גרף", list(CHART_BARS), default="3M", key=f'{key}_period_{t}',
+                                  label_visibility='collapsed') or "3M"
+    style = g2.segmented_control("סוג גרף", ["קו", "נרות"], default="קו", key=f'{key}_style_{t}',
+                                 label_visibility='collapsed') or "קו"
+    st.plotly_chart(price_chart(hist, CHART_BARS[period], pos['avg'] if pos else None, sym, style == "נרות"),
                     width='stretch', config={"displayModeBar": False}, key=f'{key}_chart_{t}')
 
     if 'rsi' in s:
@@ -936,17 +1166,19 @@ def render_stock_detail(t, s, hist, pos=None, key='detail'):
         f1.metric("P/E", f"{s['pe']:.1f}" if s['pe'] else "—")
         f2.metric("P/E עתידי", f"{s['forward_pe']:.1f}" if s['forward_pe'] else "—")
         f3, f4 = st.columns(2)
-        f3.metric("שווי שוק", big(s['market_cap']))
+        f3.metric("שווי שוק", big(s['market_cap']) if not is_ils(t) else (f"₪{s['market_cap'] / 1e9:,.2f}B" if s['market_cap'] else "—"))
         f4.metric("תשואת דיבידנד", f"{div_yield:.2f}%" if div_yield else "—")
         f5, f6 = st.columns(2)
         f5.metric("יעד אנליסטים", money(s['target'], sym) if s['target'] else "—",
                   pct(upside, 1) if upside is not None else None)
         f6.metric("המלצה", s['rec'].replace('_', ' '), f"{s['n_analysts']} אנליסטים" if s['n_analysts'] else None,
-                  delta_color='off')
+                  delta_color='off', delta_arrow='off')
         if s['quote_type'] != 'ETF':
             st.caption(f"צמיחת הכנסות {s['growth']:.1f}% · שולי רווח {s['margin']:.1f}% · ROE {s['roe']:.1f}%")
+        if is_ils(t):
+            st.caption("כיסוי הנתונים הפונדמנטליים למניות ת״א ב-Yahoo חלקי — ייתכנו שדות ריקים.")
 
-    if s['quote_type'] not in ('ETF', 'CRYPTOCURRENCY', 'INDEX', 'CURRENCY'):
+    if s['quote_type'] not in ('ETF', 'CRYPTOCURRENCY', 'INDEX', 'CURRENCY', 'MUTUALFUND'):
         e = get_earnings_many((t,)).get(t, {})
         if e.get('next') is not None:
             est = f" · תחזית EPS {money(e['eps_est'], sym)}" if e.get('eps_est') is not None else ''
@@ -963,7 +1195,7 @@ def render_cash_editor(form_key):
         ils = c2.number_input("מזומן בשקל (₪)", value=float(cfg['cash_ils']), step=10.0, format="%.2f")
         inv = st.number_input("סך הפקדות נטו ($)", value=float(cfg['initial_investment']), step=100.0, format="%.2f",
                               help="כמה כסף הפקדת בסך הכול פחות משיכות. משמש לחישוב התשואה הכוללת.")
-        if st.form_submit_button("שמור יתרות"):
+        if st.form_submit_button("שמור יתרות", width='stretch'):
             new_cfg = {'cash_usd': usd, 'cash_ils': ils, 'initial_investment': inv}
             st.session_state.config = new_cfg
             flash(*SAVE_MSG[save_config(new_cfg)])
@@ -1020,41 +1252,49 @@ for _, w in watch.iterrows():
     if not s:
         continue
     if w['AlertHigh'] > 0 and s['price'] >= w['AlertHigh']:
-        watch_alerts.append((w['Ticker'], f"{money(s['price'], s['sym'])} — עבר את יעד העלייה {money(w['AlertHigh'], s['sym'])}", GAIN))
+        watch_alerts.append((w['Ticker'], f"{iso(money(s['price'], s['sym']))} — מעל יעד ההתראה {iso(money(w['AlertHigh'], s['sym']))}", GAIN))
     if w['AlertLow'] > 0 and s['price'] <= w['AlertLow']:
-        watch_alerts.append((w['Ticker'], f"{money(s['price'], s['sym'])} — ירד מתחת ליעד {money(w['AlertLow'], s['sym'])}", LOSS))
+        watch_alerts.append((w['Ticker'], f"{iso(money(s['price'], s['sym']))} — מתחת ליעד ההתראה {iso(money(w['AlertLow'], s['sym']))}", LOSS))
+
+def wall_street_open(market):
+    """Open only during NYSE hours on a day SPY actually printed a bar (so holidays read as closed)."""
+    ny = datetime.now(ZoneInfo("America/New_York"))
+    in_hours = ny.weekday() < 5 and (9, 30) <= (ny.hour, ny.minute) < (16, 0)
+    traded_today = 'SPY' in market and market['SPY']['last_date'].date() == ny.date()
+    return in_hours and traded_today
+
+is_open = wall_street_open(market)
+st.markdown(f'<div class="topbar"><span class="wordmark">AlonStocks Pro</span>'
+            f'<span class="live"><span class="live-dot{"" if is_open else " closed"}"></span>'
+            f'{"וול סטריט פתוחה" if is_open else "וול סטריט סגורה"} · {now_il():%H:%M}</span></div>', unsafe_allow_html=True)
 
 t_today, t_pos, t_search, t_watch, t_earn, t_manage = st.tabs(
-    ["היום", "פוזיציות", "חיפוש", "מעקב", "דוחות וחדשות", "ניהול"])
+    ["היום", "פוזיציות", "חיפוש", "מעקב", "דוחות", "ניהול"])
 
 # ==========================================
 # TAB: TODAY
 # ==========================================
 with t_today:
+    def badge(value, label, color):
+        return f'<span class="badge"><span class="num ltr" style="color:{color}">{esc(value)}</span>{esc(label)}</span>'
     now = now_il()
-    h1, h2 = st.columns([3, 1])
-    h1.markdown(f'<div class="stamp">יום {DAYS_HE[now.weekday()]}, {now:%d.%m.%Y} · עודכן {now:%H:%M}</div>',
-                unsafe_allow_html=True)
-    if h2.button("רענן מחירים"):
-        load_market.clear()
-        download_history.clear()
-        st.rerun()
-
-    st.markdown('<div class="hero-label">שווי תיק כולל</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="hero-value">${total_value:,.0f}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="hero-change"><span style="color:{tone(day_pl)}">{signed_money(day_pl)} ({pct(day_pct)}) היום</span>'
-                f'&nbsp;&nbsp;·&nbsp;&nbsp;<span style="color:{tone(total_return)}">{signed_money(total_return)} ({pct(total_return_pct, 1)}) מאז ההפקדה</span></div>',
-                unsafe_allow_html=True)
     spy_day = market.get('SPY', {}).get('rets', {}).get('1d')
-    spy_txt = f"S&P 500 היום {pct(spy_day)} · " if spy_day is not None else ''
-    st.markdown(f'<div class="stamp">{spy_txt}≈ ₪{total_value * usd_ils:,.0f} לפי שער {usd_ils:.3f}</div>', unsafe_allow_html=True)
-
+    badges = [badge(f"{signed_money(day_pl)} ({pct(day_pct)})", "היום", tone(day_pl)),
+              badge(f"{signed_money(total_return)} ({pct(total_return_pct, 1)})", "מאז ההפקדה", tone(total_return))]
+    if spy_day is not None:
+        badges.append(badge(pct(spy_day), "S&P 500", tone(spy_day)))
+    st.markdown(f'<div class="hero"><div class="hero-label">שווי תיק כולל</div>'
+                f'<div class="hero-value">${total_value:,.0f}</div>'
+                f'<div class="badges">{"".join(badges)}</div>'
+                f'<div class="stamp">≈ ₪{total_value * usd_ils:,.0f} לפי שער {usd_ils:.3f} · יום {DAYS_HE[now.weekday()]} {now:%d.%m.%Y}</div></div>',
+                unsafe_allow_html=True)
     m1, m2 = st.columns(2)
-    m1.metric("שווי מניות", money(stock_value, '$', 0), f"{signed_money(day_pl)} היום")
-    m2.metric("מזומן", money(cash_total, '$', 0), f"${cfg['cash_usd']:,.0f} + ₪{cfg['cash_ils']:,.0f}", delta_color='off')
+    m1.metric("שווי מניות", money(stock_value, '$', 0), f"{signed_money(day_pl)} היום",
+              delta_color='normal' if round(day_pl) else 'off', delta_arrow='auto' if round(day_pl) else 'off')
+    m2.metric("מזומן", money(cash_total, '$', 0), f"${cfg['cash_usd']:,.0f} + ₪{cfg['cash_ils']:,.0f}", delta_color='off', delta_arrow='off')
     m3, m4 = st.columns(2)
     m3.metric("רווח/הפסד פתוח", signed_money(unreal_total), pct(unreal_total / cost_total * 100 if cost_total else 0))
-    m4.metric("תשואה כוללת", pct(total_return_pct, 1), f"מול ${net_deposits:,.0f} הפקדות", delta_color='off')
+    m4.metric("תשואה כוללת", pct(total_return_pct, 1), f"מול ${net_deposits:,.0f} הפקדות", delta_color='off', delta_arrow='off')
 
     with st.expander("עדכון יתרות מזומן"):
         render_cash_editor('cash_form_today')
@@ -1064,40 +1304,41 @@ with t_today:
                for t, (name, sym) in MARKET_TICKERS.items() if t in market])
 
     if missing:
-        st.warning(f"לא התקבלו נתונים עבור: {', '.join(missing)}. בדוק/י שהסימול נכון (מניות ת״א עם ‎.TA).")
+        st.warning(f"לא התקבלו נתונים עבור: {', '.join(missing)}. מניות ת״א נשמרות עם הסיומת ‎.TA (למשל LUMI.TA) — אפשר לתקן בלשונית ניהול.")
 
     # ── Needs attention ──
     with st.spinner("בודק דוחות רווחים..."):
         upcoming, _ = earnings_board(p_tickers + w_tickers, snaps)
-    attention = []
+    attention = {}
+    def flag(t, note, color):
+        notes, first_color = attention.get(t, ([], color))
+        attention[t] = (notes + [note], first_color)
     for r in positions:
-        s, notes = snaps[r['ticker']], []
+        s_ = snaps[r['ticker']]
         if abs(r['day_pct']) >= 3:
-            notes.append(f"תנועה חדה היום {pct(r['day_pct'], 1)}")
-        if s['price'] >= s['hi52'] * 0.98:
-            notes.append("קרוב לשיא 52 שבועות")
-        elif s['price'] <= s['lo52'] * 1.02:
-            notes.append("קרוב לשפל 52 שבועות")
-        if s.get('rsi', 50) >= 75:
-            notes.append(f"RSI גבוה ({s['rsi']:.0f})")
-        elif s.get('rsi', 50) <= 25:
-            notes.append(f"RSI נמוך ({s['rsi']:.0f})")
+            flag(r['ticker'], f"תנועה חדה היום {iso(pct(r['day_pct'], 1))}", tone(r['day_pct']))
+        if s_['price'] >= s_['hi52'] * 0.98:
+            flag(r['ticker'], "קרוב לשיא 52 שבועות", GAIN)
+        elif s_['price'] <= s_['lo52'] * 1.02:
+            flag(r['ticker'], "קרוב לשפל 52 שבועות", LOSS)
+        if s_.get('rsi', 50) >= 75:
+            flag(r['ticker'], f"RSI גבוה ({s_['rsi']:.0f})", GOLD)
+        elif s_.get('rsi', 50) <= 25:
+            flag(r['ticker'], f"RSI נמוך ({s_['rsi']:.0f})", GOLD)
         if r['unreal_pct'] <= -15:
-            notes.append(f"{r['unreal_pct']:.1f}% מתחת למחיר הקנייה")
+            flag(r['ticker'], f"{iso(pct(r['unreal_pct'], 1))} מאז הקנייה", LOSS)
         if r['weight'] >= 35 and r['quote_type'] != 'ETF':
-            notes.append(f"{r['weight']:.0f}% מהתיק בפוזיציה אחת")
-        if notes:
-            attention.append((r['ticker'], ' · '.join(notes), tone(r['day_pct'])))
+            flag(r['ticker'], f"{iso(format(r['weight'], '.0f') + '%')} מהתיק בפוזיציה אחת", GOLD)
     for u in upcoming:
         if u['days'] <= 7:
             when = "היום" if u['days'] == 0 else "מחר" if u['days'] == 1 else f"בעוד {u['days']} ימים"
-            attention.append((u['ticker'], f"דוח רווחים {when} ({u['date']:%d.%m})", GOLD))
-    attention += watch_alerts
+            flag(u['ticker'], f"דוח רווחים {when} ({u['date']:%d.%m})", GOLD)
+    for t, msg, color in watch_alerts:
+        flag(t, msg, color)
 
-    section("דורש תשומת לב")
+    section("דורש תשומת לב", f"{len(attention)} סימולים" if attention else None)
     if attention:
-        for t, msg, color in attention:
-            attn(t, msg, color)
+        attn_list([(t, ' · '.join(notes), color) for t, (notes, color) in attention.items()])
     else:
         st.caption("אין אירועים חריגים בתיק היום.")
 
@@ -1108,18 +1349,18 @@ with t_today:
             r['ticker'], r['name'][:26], money(r['price'], r['sym']),
             f"{pct(r['day_pct'])}  {signed_money(r['pl_1d'])}", tone(r['pl_1d']),
             pct(r['unreal_pct'], 1), tone(r['unreal']),
-            caption=f"{signed_money(r['unreal'])} כולל · שווי ${r['value']:,.0f} · {r['weight']:.1f}%")
+            caption=f"{iso(signed_money(r['unreal']))} כולל")
             for r in sorted(positions, key=lambda x: x['day_pct'], reverse=True)]
         rows_html.append(ledger_row(
             "סה״כ", f"{len(positions)} פוזיציות", money(stock_value, '$', 0),
             f"{pct(day_pct)}  {signed_money(day_pl)}", tone(day_pl),
             pct(unreal_total / cost_total * 100 if cost_total else 0, 1), tone(unreal_total),
-            caption=f"{signed_money(unreal_total)} כולל", total=True))
+            caption=f"{iso(signed_money(unreal_total))} כולל", total=True))
         render_ledger(rows_html)
 
         # ── Period performance ──
         section("ביצועים לפי תקופה", "לפי הכמויות שמוחזקות כרגע, ללא מזומן")
-        per_label = st.radio("תקופה", list(PERIODS), horizontal=True, key='today_period', label_visibility='collapsed')
+        per_label = st.segmented_control("תקופה", list(PERIODS), default="יום", key='today_period', label_visibility='collapsed') or "יום"
         p = PERIODS[per_label]
         pl_period = sum(r[f'pl_{p}'] for r in positions)
         base_value = stock_value - pl_period
@@ -1132,8 +1373,11 @@ with t_today:
             x=[r[f'pl_{p}'] for r in ordered], y=[r['ticker'] for r in ordered], orientation='h',
             marker_color=[tone(r[f'pl_{p}']) for r in ordered],
             text=[f"{signed_money(r[f'pl_{p}'])} ({pct((r['price'] / snaps[r['ticker']]['bases'][p] - 1) * 100, 1)})" for r in ordered],
-            textposition='auto'))
-        dark_layout(fig, 70 + 38 * len(ordered))
+            textposition='auto', marker_cornerradius=4, insidetextfont=dict(color='#09090B'), outsidetextfont=dict(color=TEXT),
+            hovertemplate='%{y}: %{text}<extra></extra>'))
+        dark_layout(fig, 60 + 40 * len(ordered))
+        fig.update_layout(bargap=0.35)
+        fig.update_xaxes(showticklabels=False, showgrid=False, zeroline=True, zerolinecolor=LINE)
         st.plotly_chart(fig, width='stretch', config={"displayModeBar": False}, key='period_chart')
 
     # ── Earnings calendar ──
@@ -1142,11 +1386,16 @@ with t_today:
         section("דוחות רווחים בשבועיים הקרובים", "תאריכים לפי Yahoo Finance; ייתכנו שינויים")
         render_ledger([ledger_row(
             u['ticker'], f"תחזית EPS {u['eps_est']:.2f}" if u['eps_est'] is not None else "אין תחזית",
-            f"{u['date']:%d.%m}", "היום" if u['days'] == 0 else f"בעוד {u['days']} ימים", TEXT_DIM,
-            "בתיק" if u['ticker'] in pos_by_ticker else "במעקב", GOLD if u['days'] <= 7 else TEXT_DIM)
+            f"{u['date']:%d.%m}", "היום" if u['days'] == 0 else f"בעוד {u['days']} ימים", GOLD if u['days'] <= 7 else TEXT_DIM,
+            "בתיק" if u['ticker'] in pos_by_ticker else "במעקב", TEXT_DIM)
             for u in soon])
 
-    st.caption("המידע מוצג לצורך מעקב אישי בלבד ואינו מהווה ייעוץ השקעות.")
+    st.markdown('<div style="height:18px"></div>', unsafe_allow_html=True)
+    if st.button("רענן מחירים", key='refresh'):
+        load_market.clear()
+        download_history.clear()
+        st.rerun()
+    st.caption("מחירים מתעדכנים אוטומטית כל 5 דקות. המידע מוצג לצורך מעקב אישי בלבד ואינו מהווה ייעוץ השקעות.")
 
 # ==========================================
 # TAB: POSITIONS
@@ -1183,10 +1432,12 @@ with t_pos:
             if cash_total > 0:
                 alloc['מזומן'] = cash_total
             fig_pie = px.pie(values=list(alloc.values()), names=list(alloc.keys()), hole=0.55,
-                             color_discrete_sequence=[GOLD, GAIN, INFO, LOSS, TEXT_DIM, '#8C7239', '#3F6E58', '#4A6A8C'])
-            fig_pie.update_traces(textinfo='label+percent')
-            fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color=TEXT, height=300,
-                                  margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
+                             color_discrete_sequence=['#FAFAFA', '#60A5FA', '#22C55E', '#F59E0B', '#A78BFA', '#A1A1AA', '#F472B6', '#52525B'])
+            fig_pie.update_traces(textinfo='label+percent', marker=dict(line=dict(color=INK, width=2)),
+                                  hovertemplate='%{label}: $%{value:,.0f} (%{percent})<extra></extra>')
+            fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font=dict(family=FONT, color=TEXT), height=300,
+                                  margin=dict(l=0, r=0, t=10, b=0), showlegend=False,
+                                  hoverlabel=dict(bgcolor=PANEL, bordercolor=LINE, font=dict(family=FONT, color=TEXT)))
             section("פיזור התיק")
             st.plotly_chart(fig_pie, width='stretch', config={"displayModeBar": False}, key='alloc_pie')
         else:
@@ -1195,31 +1446,61 @@ with t_pos:
 # ==========================================
 # TAB: SEARCH
 # ==========================================
+def pick_lookup(sym):
+    """Callback: runs before widgets are created, so it may set the search box's state."""
+    current = st.session_state.get('search_list', [])
+    st.session_state.search_list = [sym] + [x for x in current if x != sym]
+    st.session_state.search_input = ', '.join(st.session_state.search_list)
+    st.session_state.search_market_used = 'auto'
+    st.session_state.search_unknown = []
+
 with t_search:
-    section("חיפוש והשוואה", "סימול אחד או כמה, מופרדים בפסיק או ברווח. מניות ת״א עם ‎.TA (למשל TEVA.TA)")
+    section("חיפוש מניות", "כמה סימולים או שמות בעברית, מופרדים בפסיק — למשל: AAPL, NVDA, לאומי, טבע")
     with st.form('search_form'):
-        query = st.text_input("סימולים", value=' '.join(st.session_state.get('search_list', [])),
-                              placeholder="AAPL, NVDA, TEVA.TA")
-        if st.form_submit_button("חפש"):
-            st.session_state.search_list = parse_tickers(query)
-            if not st.session_state.search_list:
-                st.error("לא זוהו סימולים תקינים.")
+        query = st.text_input("סימולים או שמות", key='search_input',
+                              placeholder="AAPL, NVDA, לאומי, ESLT.TA", label_visibility='collapsed')
+        s_market = st.segmented_control("שוק", list(MARKET_OPTIONS), format_func=MARKET_OPTIONS.get,
+                                        default='auto', key='search_market') or 'auto'
+        st.caption("זיהוי אוטומטי: מחפש קודם בארה״ב, ואם הסימול לא קיים שם — בבורסת ת״א. כדי לכפות ת״א בחר/י ״בורסת ת״א״.")
+        if st.form_submit_button("חפש", width='stretch'):
+            syms, unknown = parse_tickers(query, s_market)
+            st.session_state.search_list = syms
+            st.session_state.search_market_used = s_market
+            st.session_state.search_unknown = unknown
+            if not syms and not unknown:
+                st.error("הזן/י לפחות סימול או שם אחד.")
+
+    with st.expander("לא יודע/ת את הסימול? חיפוש לפי שם חברה"):
+        with st.form('lookup_form'):
+            lk_q = st.text_input("שם החברה", placeholder="Elbit / Teva / בנק הפועלים")
+            lk_ta = st.checkbox("רק בורסת ת״א", value=False)
+            if st.form_submit_button("מצא", width='stretch'):
+                st.session_state.lookup = search_symbols(lk_q, lk_ta)
+                st.session_state.lookup_done = bool(lk_q.strip())
+        results = st.session_state.get('lookup', [])
+        if st.session_state.get('lookup_done') and not results:
+            st.info("לא נמצאו התאמות. נסה/י שם באנגלית (למשל Elbit Systems) — החיפוש בעברית מכסה רק את המניות הגדולות בת״א.")
+        for r in results:
+            c1, c2 = st.columns([4, 1], vertical_alignment='center')
+            c1.markdown(f'<div><span class="row-ticker">{esc(r["symbol"])}</span><span class="chip">{esc(r["exchange"])}</span></div>'
+                        f'<div class="row-name">{esc(r["name"])}</div>', unsafe_allow_html=True)
+            c2.button("הצג", key=f'lookup_{r["symbol"]}', on_click=pick_lookup, args=(r['symbol'],))
+
+    if st.session_state.get('search_unknown'):
+        st.warning(f"לא זוהו: {', '.join(st.session_state.search_unknown)}. לשמות שלא מוכרים — השתמש/י בחיפוש לפי שם חברה.")
 
     search_list = st.session_state.get('search_list', [])
     if search_list:
         with st.spinner("טוען..."):
-            s_hists, s_snaps = load_market(tuple(sorted(search_list)), True)
-        bad = [t for t in search_list if t not in s_snaps]
-        good = [t for t in search_list if t in s_snaps]
+            s_hists, s_snaps, good, bad = load_with_fallback(search_list, st.session_state.get('search_market_used', 'auto'))
         if bad:
             st.warning(f"לא נמצאו נתונים עבור: {', '.join(bad)}")
         if good:
             render_ledger([ledger_row(
                 t, s_snaps[t]['name'][:26], money(s_snaps[t]['price'], s_snaps[t]['sym']),
                 f"{pct(s_snaps[t]['rets']['1d'])} היום", tone(s_snaps[t]['rets']['1d']),
-                f"{pct(s_snaps[t]['rets']['ytd'], 1)} השנה", tone(s_snaps[t]['rets']['ytd']),
-                caption=f"שבוע {pct(s_snaps[t]['rets']['1w'], 1)} · חודש {pct(s_snaps[t]['rets']['1m'], 1)}"
-                        + (" · בתיק" if t in pos_by_ticker else ""))
+                f"{pct(s_snaps[t]['rets']['ytd'], 1)}", tone(s_snaps[t]['rets']['ytd']),
+                caption="השנה" + (" · בתיק" if t in pos_by_ticker else " · במעקב" if t in w_tickers else ""))
                 for t in good])
 
             if len(good) > 1:
@@ -1235,7 +1516,8 @@ with t_search:
                     st.dataframe(styled_table(cmp_df, pcols, fmt), width='stretch', hide_index=True)
 
             section("ניתוח מלא")
-            pick = st.selectbox("בחר/י מניה", good, key='search_pick')
+            pick = st.selectbox("בחר/י מניה", good, key='search_pick',
+                                format_func=lambda x: f"{x} — {s_snaps[x]['name']}")
             render_stock_detail(pick, s_snaps[pick], s_hists[pick], pos_by_ticker.get(pick), key='search')
             if pick not in w_tickers and pick not in pos_by_ticker:
                 if st.button(f"הוסף את {pick} לרשימת המעקב", key='search_add_watch'):
@@ -1253,20 +1535,27 @@ with t_watch:
     with st.expander("הוספה או עדכון של מניה ברשימה", expanded=watch.empty):
         with st.form("add_watchlist", clear_on_submit=True):
             w1, w2 = st.columns(2)
-            wl_ticker = w1.text_input("סימול").strip().upper()
+            wl_ticker = w1.text_input("סימול או שם", placeholder="NVDA / לאומי / POLI.TA")
             wl_notes = w2.text_input("הערה")
+            wl_market = st.segmented_control("שוק", list(MARKET_OPTIONS), format_func=MARKET_OPTIONS.get,
+                                             default='auto', key='wl_market') or 'auto'
             w3, w4 = st.columns(2)
             wl_high = w3.number_input("התראה כשהמחיר מעל", min_value=0.0, value=0.0, step=1.0)
             wl_low = w4.number_input("התראה כשהמחיר מתחת", min_value=0.0, value=0.0, step=1.0)
-            if st.form_submit_button("שמור ברשימה"):
-                if not parse_tickers(wl_ticker):
-                    st.error("הזן/י סימול תקין.")
+            st.caption("מחירי התראה של מניות ת״א — בשקלים.")
+            if st.form_submit_button("שמור ברשימה", width='stretch'):
+                sym, last = resolve_single(wl_ticker, wl_market)
+                if sym is None:
+                    st.error("לא זוהה סימול. הזן/י סימול (NVDA, LUMI.TA) או שם מוכר בעברית.")
+                elif last is None:
+                    st.error(f"לא נמצאו נתוני מסחר עבור {sym}. בדוק/י את הסימול או בחר/י את השוק הנכון.")
                 else:
-                    new_wl = clean_watchlist(pd.concat([watch, pd.DataFrame([{'Ticker': wl_ticker, 'Notes': wl_notes,
+                    new_wl = clean_watchlist(pd.concat([watch, pd.DataFrame([{'Ticker': sym, 'Notes': wl_notes,
                                                                              'AlertHigh': wl_high, 'AlertLow': wl_low}])],
                                                        ignore_index=True))
                     st.session_state.watchlist = new_wl
-                    flash(*SAVE_MSG[save_watchlist(new_wl)])
+                    kind, msg = SAVE_MSG[save_watchlist(new_wl)]
+                    flash(kind, f"{sym} נשמר ברשימה — {msg}")
                     st.rerun()
 
     if watch.empty:
@@ -1274,8 +1563,7 @@ with t_watch:
     else:
         if watch_alerts:
             section("התראות מחיר שהופעלו")
-            for t, msg, color in watch_alerts:
-                attn(t, msg, color)
+            attn_list(watch_alerts)
 
         section("רשימת מעקב")
         rows_html = []
@@ -1289,7 +1577,7 @@ with t_watch:
                     w['Ticker'], w['Notes'] or s['name'][:26], money(s['price'], s['sym']),
                     f"{pct(s['rets']['1d'])} היום", tone(s['rets']['1d']),
                     f"{pct(s['rets']['1w'], 1)} שבוע", tone(s['rets']['1w']),
-                    caption=f"חודש {pct(s['rets']['1m'], 1)}" + (f" · התראות: {alerts_txt}" if alerts_txt else '')))
+                    caption=f"חודש {iso(pct(s['rets']['1m'], 1))}" + (f" · התראה: {alerts_txt}" if alerts_txt else '')))
             else:
                 rows_html.append(ledger_row(w['Ticker'], w['Notes'], "—", "אין נתונים", TEXT_DIM, "—", TEXT_DIM))
         render_ledger(rows_html)
@@ -1324,8 +1612,8 @@ with t_earn:
             if upcoming_all:
                 render_ledger([ledger_row(
                     u['ticker'], f"תחזית EPS {u['eps_est']:.2f}" if u['eps_est'] is not None else "אין תחזית",
-                    f"{u['date']:%d.%m.%Y}", "היום" if u['days'] == 0 else f"בעוד {u['days']} ימים", TEXT_DIM,
-                    "בתיק" if u['ticker'] in pos_by_ticker else "במעקב", GOLD if u['days'] <= 7 else TEXT_DIM)
+                    f"{u['date']:%d.%m.%Y}", "היום" if u['days'] == 0 else f"בעוד {u['days']} ימים", GOLD if u['days'] <= 7 else TEXT_DIM,
+                    "בתיק" if u['ticker'] in pos_by_ticker else "במעקב", TEXT_DIM)
                     for u in upcoming_all[:15]])
             else:
                 st.info("אין תאריכי דוחות ידועים כרגע.")
@@ -1368,7 +1656,7 @@ with t_manage:
             cf_cur = c2.selectbox("מטבע", ["USD", "ILS"])
             cf_amt = c3.number_input("סכום", min_value=0.0, step=100.0, format="%.2f")
             cf_note = st.text_input("הערה (לא חובה)")
-            if st.form_submit_button("רשום פעולה"):
+            if st.form_submit_button("רשום פעולה", width='stretch'):
                 if cf_amt <= 0:
                     st.error("הזן/י סכום גדול מאפס.")
                 else:
@@ -1393,21 +1681,32 @@ with t_manage:
         section("רישום קנייה או מכירה", "מעדכן את התיק, ואם תבחר/י — גם את יתרת המזומן")
         with st.form("trade_form", clear_on_submit=True):
             q1, q2 = st.columns([3, 2])
-            tr_ticker = q1.text_input("סימול", placeholder="AAPL / TEVA.TA").strip().upper()
+            tr_input = q1.text_input("סימול או שם", placeholder="AAPL / לאומי / TEVA.TA")
             tr_action = q2.selectbox("פעולה", ["קנייה", "מכירה"])
+            tr_market = st.segmented_control("שוק", list(MARKET_OPTIONS), format_func=MARKET_OPTIONS.get,
+                                             default='auto', key='trade_market') or 'auto'
             q3, q4 = st.columns(2)
             tr_qty = q3.number_input("כמות", min_value=0.0, step=0.1, value=1.0, format="%.4f")
-            tr_price = q4.number_input("מחיר ליחידה (0 = מחיר אחרון)", min_value=0.0, step=0.01, format="%.2f")
+            tr_price = q4.number_input("מחיר ליחידה (0 = מחיר אחרון)", min_value=0.0, step=0.01, format="%.2f",
+                                       help="במטבע המסחר: שקלים למניות ת״א, דולרים למניות ארה״ב.")
             tr_cash = st.checkbox("עדכן את יתרת המזומן", value=True)
-            if st.form_submit_button("רשום עסקה"):
+            if st.form_submit_button("רשום עסקה", width='stretch'):
                 action = 'buy' if tr_action == "קנייה" else 'sell'
-                valid = bool(parse_tickers(tr_ticker)) and tr_qty > 0
+                held = {t: t for t in portfolio.index} | {t[:-3]: t for t in portfolio.index if t.endswith('.TA')}
+                typed, _ = parse_tickers(tr_input, tr_market, 1)
+                if action == 'sell' and typed and tr_market == 'auto' and typed[0] in held:
+                    tr_ticker, last = held[typed[0]], None
+                else:
+                    tr_ticker, last = resolve_single(tr_input, tr_market)
+                valid = tr_ticker is not None and tr_qty > 0
                 price = tr_price
                 if valid and price <= 0:
-                    h = download_history((tr_ticker,), '1mo').get(tr_ticker)
-                    price = float(h['Close'].iloc[-1]) if h is not None else 0.0
+                    if last is None:
+                        h = download_history((tr_ticker,), '1mo').get(tr_ticker)
+                        last = float(h['Close'].iloc[-1]) if h is not None else None
+                    price = last or 0.0
                 if not valid:
-                    st.error("הזן/י סימול וכמות גדולה מאפס.")
+                    st.error("הזן/י סימול (או שם מוכר בעברית) וכמות גדולה מאפס.")
                 elif price <= 0:
                     st.error(f"לא נמצא מחיר עבור {tr_ticker} — הזן/י מחיר ידנית.")
                 elif action == 'sell' and tr_ticker not in portfolio.index:
@@ -1499,11 +1798,11 @@ with t_manage:
                 port_beta = float(sum(rd.loc[t, 'בטא'] * w for t, w in weights.items() if t in rd.index and np.isfinite(rd.loc[t, 'בטא'])))
                 top = max(positions, key=lambda x: x['weight'])
                 k1, k2 = st.columns(2)
-                k1.metric("בטא משוקלל לתיק", f"{port_beta:.2f}", "תנודתי מהשוק" if port_beta > 1.1 else "דומה לשוק או פחות", delta_color='off')
-                k2.metric("הפוזיציה הגדולה", top['ticker'], f"{top['weight']:.1f}% מהתיק", delta_color='off')
+                k1.metric("בטא משוקלל לתיק", f"{port_beta:.2f}", "תנודתי מהשוק" if port_beta > 1.1 else "דומה לשוק או פחות", delta_color='off', delta_arrow='off')
+                k2.metric("הפוזיציה הגדולה", top['ticker'], f"{top['weight']:.1f}% מהתיק", delta_color='off', delta_arrow='off')
                 k3, k4 = st.columns(2)
                 worst_row = rd['ירידה מקסימלית %'].idxmin()
-                k3.metric("ירידה מקסימלית בשנה", f"{rd.loc[worst_row, 'ירידה מקסימלית %']:.1f}%", worst_row, delta_color='off')
+                k3.metric("ירידה מקסימלית בשנה", f"{rd.loc[worst_row, 'ירידה מקסימלית %']:.1f}%", worst_row, delta_color='off', delta_arrow='off')
                 k4.metric("מזומן מתוך התיק", f"{cash_total / total_value * 100 if total_value else 0:.1f}%")
                 st.dataframe(risk_df.style.format({c: '{:.2f}' for c in risk_df.columns if c != 'סימול'}, na_rep='—'),
                              width='stretch', hide_index=True)
@@ -1535,8 +1834,8 @@ with t_manage:
                 pos_usd = shares * cur_p * k
                 sym = ps_snap['sym']
                 c1, c2 = st.columns(2)
-                c1.metric("יחידות לקנייה", str(shares), f"מחיר {money(cur_p, sym)}", delta_color='off')
-                c2.metric("גודל הפוזיציה", money(pos_usd), f"{pos_usd / ps_account * 100:.1f}% מהתיק" if ps_account else None, delta_color='off')
+                c1.metric("יחידות לקנייה", str(shares), f"מחיר {money(cur_p, sym)}", delta_color='off', delta_arrow='off')
+                c2.metric("גודל הפוזיציה", money(pos_usd), f"{pos_usd / ps_account * 100:.1f}% מהתיק" if ps_account else None, delta_color='off', delta_arrow='off')
                 c3, c4 = st.columns(2)
                 c3.metric("Stop Loss", money(cur_p * (1 - ps_stop / 100), sym), f"-{ps_stop}%")
                 c4.metric("Take Profit", money(cur_p * (1 + ps_target / 100), sym), f"+{ps_target}%")
