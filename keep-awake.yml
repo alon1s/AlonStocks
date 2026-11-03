@@ -1,0 +1,92 @@
+# Opens the Streamlit Community Cloud app in a real (headless) browser every 6 hours,
+# so it never reaches the 12-hour idle limit. If the app is already asleep, it clicks
+# the wake-up button and waits for it to boot.
+#
+# Setup: repo Settings → Secrets and variables → Actions → Variables → New variable
+#   Name:  STREAMLIT_APP_URL     Value: https://<your-app>.streamlit.app
+
+name: Keep Streamlit app awake
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # every 6 hours, off the top of the hour (GitHub delays :00 runs)
+  workflow_dispatch:          # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: read
+  actions: write              # used by the last step to keep this schedule enabled
+
+concurrency:
+  group: keep-awake
+  cancel-in-progress: true
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_URL: ${{ vars.STREAMLIT_APP_URL }}
+    steps:
+      - name: Check configuration
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "::error::Set the STREAMLIT_APP_URL repository variable (Settings → Secrets and variables → Actions → Variables)."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          pip install playwright==1.49.1
+          python -m playwright install --with-deps chromium
+
+      - name: Visit the app
+        shell: python
+        run: |
+          import os, sys
+          from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+
+          url = os.environ["APP_URL"]
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page(viewport={"width": 1280, "height": 900})
+              page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+              page.wait_for_timeout(5_000)
+
+              wake = page.get_by_role("button", name="get this app back up", exact=False)
+              if wake.count():
+                  print("App was asleep — waking it up.")
+                  wake.first.click()
+                  page.wait_for_timeout(90_000)   # cold start: install packages + first data load
+              else:
+                  print("App is awake — keeping the session open.")
+                  page.wait_for_timeout(30_000)
+
+              page.screenshot(path="app.png", full_page=False)
+              still_asleep = page.get_by_role("button", name="get this app back up", exact=False).count() > 0
+              browser.close()
+
+          if still_asleep:
+              print("::error::App still shows the sleep screen after the wake-up attempt.")
+              sys.exit(1)
+          print("Done.")
+
+      - name: Save screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-screenshot
+          path: app.png
+          if-no-files-found: ignore
+          retention-days: 3
+
+      # GitHub disables scheduled workflows after 60 days without repo activity.
+      # Re-enabling the workflow through the API resets that timer.
+      - name: Keep this schedule enabled
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-awake.yml/enable" || true
