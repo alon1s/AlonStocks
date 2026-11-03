@@ -48,7 +48,7 @@ st.markdown("""
         --foreground:#FAFAFA; --muted-foreground:#A1A1AA; --faint:#71717A;
         --gain:#22C55E; --loss:#EF4444; --warn:#F59E0B; --info:#60A5FA; --radius:12px;
     }
-    .main .block-container, [data-testid="stMainBlockContainer"] { padding:3.4rem 1rem 112px !important; max-width:880px !important; }
+    .main .block-container, [data-testid="stMainBlockContainer"] { padding:3.4rem 1rem 96px !important; max-width:880px !important; }
     [data-testid="stHeader"] { background:transparent; }
     input, select, textarea { font-size:16px !important; }
     * { font-variant-numeric:tabular-nums; }
@@ -202,18 +202,20 @@ st.markdown("""
     [data-testid="stTabs"] [role="tablist"] { direction:rtl; }
     [data-testid="stTab"] p { font-size:0.9rem; }
     @media (max-width: 900px) {
+        [data-testid="stHeader"] { background:rgba(9,9,11,.96) !important; }
+        /* Main navigation: sticky bar at the top (the bottom corners are covered by Streamlit Cloud's own badges) */
         [data-testid="stTabs"] [role="tablist"] {
-            position:fixed !important; bottom:0 !important; left:0 !important; right:0 !important; top:auto !important; z-index:999 !important;
-            background:rgba(9,9,11,.88) !important; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
-            border-top:1px solid var(--border) !important; padding:4px 2px calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
-            margin:0 !important; display:flex !important; justify-content:space-around !important; gap:0 !important; overflow:visible !important;
+            position:sticky !important; top:3.6rem !important; z-index:999 !important;
+            background:rgba(9,9,11,.92) !important; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+            border-bottom:1px solid var(--border) !important; padding:0 !important;
+            margin:0 0 6px !important; display:flex !important; justify-content:space-around !important; gap:0 !important; overflow:visible !important;
         }
         [data-testid="stTabs"] [role="tablist"] > [role="tab"] {
-            flex:1 1 0 !important; min-width:0 !important; justify-content:center !important; padding:10px 2px !important; margin:0 !important;
+            flex:1 1 0 !important; min-width:0 !important; justify-content:center !important; padding:12px 2px !important; margin:0 !important;
             color:var(--muted-foreground) !important; border:none !important;
         }
-        [data-testid="stTabs"] [role="tablist"] > [role="tab"] p { font-size:0.72rem !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        [data-testid="stTabs"] [role="tablist"] > [role="tab"][aria-selected="true"] { color:var(--foreground) !important; }
+        [data-testid="stTabs"] [role="tablist"] > [role="tab"] p { font-size:0.8rem !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        [data-testid="stTabs"] [role="tablist"] > [role="tab"][aria-selected="true"] { color:var(--foreground) !important; box-shadow:inset 0 -2px 0 var(--foreground); }
         [data-testid="stTabs"] [role="tablist"] > [role="tab"][aria-selected="true"] p { font-weight:600; }
         [data-testid="stTabs"] [role="tablist"] > [role="tab"] > div:not([data-testid]),
         [data-testid="stTabs"] [role="tablist"] > div[data-baseweb="tab-highlight"],
@@ -221,7 +223,7 @@ st.markdown("""
 
         [data-testid="stTabPanel"] [data-testid="stTabs"] [role="tablist"], [role="tabpanel"] [data-testid="stTabs"] [role="tablist"] {
             position:static !important; background:transparent !important; backdrop-filter:none; -webkit-backdrop-filter:none;
-            border-top:none !important; border-bottom:1px solid var(--border) !important; padding:0 !important;
+            border-top:none !important; margin:0 !important; border-bottom:1px solid var(--border) !important; padding:0 !important;
             justify-content:flex-start !important; overflow-x:auto !important; gap:4px !important;
         }
         [data-testid="stTabPanel"] [data-testid="stTabs"] [role="tablist"] > [role="tab"], [role="tabpanel"] [data-testid="stTabs"] [role="tablist"] > [role="tab"] {
