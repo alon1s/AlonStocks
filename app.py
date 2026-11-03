@@ -222,7 +222,9 @@ PERIODS = {"יום": "1d", "שבוע": "1w", "חודש": "1m", "מתחילת ה�
 CHART_BARS = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "2Y": 504}
 
 MARKET_TICKERS = {'SPY': ('S&P 500', '$'), 'QQQ': ('NASDAQ 100', '$'), 'TA35.TA': ('ת״א 35', ''),
-                  '^VIX': ('VIX', ''), 'USDILS=X': ('דולר/שקל', '₪'), 'GLD': ('זהב', '$')}
+                  'TA125.TA': ('ת״א 125', ''),
+                  '^VIX': ('VIX', ''), 'USDILS=X': ('דולר/שקל', '₪')}
+
 TASE_INDICES = {'TA35.TA', 'TA90.TA', 'TA125.TA', '^TA125.TA'}  # index points, not agorot
 
 INFO_KEYS = ['longName', 'shortName', 'sector', 'quoteType', 'currency', 'trailingPE', 'forwardPE',
