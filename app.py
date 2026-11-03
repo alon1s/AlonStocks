@@ -222,10 +222,9 @@ PERIODS = {"יום": "1d", "שבוע": "1w", "חודש": "1m", "מתחילת ה�
 CHART_BARS = {"1M": 21, "3M": 63, "6M": 126, "1Y": 252, "2Y": 504}
 
 MARKET_TICKERS = {'SPY': ('S&P 500', '$'), 'QQQ': ('NASDAQ 100', '$'), 'TA35.TA': ('ת״א 35', ''),
-                  'TA125.TA': ('ת״א 125', ''),
-                  '^VIX': ('VIX', ''), 'USDILS=X': ('דולר/שקל', '₪')}
-
-TASE_INDICES = {'TA35.TA', 'TA90.TA', 'TA125.TA', '^TA125.TA'}  # index points, not agorot
+                  '^VIX': ('VIX', ''), 'USDILS=X': ('דולר/שקל', '₪'), 'GLD': ('זהב', '$')}
+TASE_INDICES = {'TA35.TA', '^TA35.TA', 'TA90.TA', 'TA125.TA', '^TA125.TA'}  # index points, not agorot
+PROXY_CANDIDATES = {'^TA125.TA': 'ת״א 125', 'TA125.TA': 'ת״א 125', 'TA35.TA': 'ת״א 35', '^TA35.TA': 'ת״א 35'}
 
 INFO_KEYS = ['longName', 'shortName', 'sector', 'quoteType', 'currency', 'trailingPE', 'forwardPE',
              'pegRatio', 'beta', 'marketCap', 'dividendRate', 'revenueGrowth', 'earningsGrowth',
@@ -334,6 +333,7 @@ def show_flash():
 # STORAGE (Google Sheets, local file fallback)
 # ==========================================
 PORT_COLS = ['Ticker', 'Quantity', 'PurchasePrice']
+PRICING_COLS = ['Proxy', 'RefPrice', 'RefProxy']  # for holdings Yahoo can't price
 WATCH_COLS = ['Ticker', 'Notes', 'AlertHigh', 'AlertLow']
 TRADE_COLS = ['Date', 'Ticker', 'Action', 'Quantity', 'Price', 'Currency', 'Realized']
 CASHFLOW_COLS = ['Date', 'Type', 'Amount', 'Currency', 'AmountUSD', 'Note']
@@ -394,12 +394,13 @@ def worst(*statuses):
 
 def clean_portfolio(data):
     df = data.reset_index() if 'Ticker' not in data.columns else data
-    df = df.reindex(columns=PORT_COLS).copy()
+    df = df.reindex(columns=PORT_COLS + PRICING_COLS).copy()
     df['Ticker'] = df['Ticker'].fillna('').astype(str).str.strip().str.upper()
-    df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0).astype(float)
-    df['PurchasePrice'] = pd.to_numeric(df['PurchasePrice'], errors='coerce').fillna(0.0).astype(float)
+    for c in ('Quantity', 'PurchasePrice', 'RefPrice', 'RefProxy'):
+        df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0.0).astype(float)
+    df['Proxy'] = df['Proxy'].fillna('').astype(str).str.strip().str.upper().replace('NAN', '')
     df = df[(df['Ticker'] != '') & (df['Ticker'] != 'NAN') & (df['Quantity'] > 0) & (df['PurchasePrice'] > 0)]
-    return df.drop_duplicates('Ticker', keep='last').set_index('Ticker')[['Quantity', 'PurchasePrice']]
+    return df.drop_duplicates('Ticker', keep='last').set_index('Ticker')[['Quantity', 'PurchasePrice'] + PRICING_COLS]
 
 def clean_watchlist(data):
     df = data.reindex(columns=WATCH_COLS).copy()
@@ -814,6 +815,31 @@ def compute_positions(portfolio, snaps, rate):
         rows.append(row)
     return rows, missing
 
+def synthetic_snapshot(t, row, hists):
+    """Prices a holding Yahoo doesn't carry. With a proxy index and a reference price, the unit price
+    follows the index's % moves from that reference; otherwise it holds the reference (or purchase) price.
+    Returns (snapshot, history_or_None)."""
+    ref_price = float(row['RefPrice']) or float(row['PurchasePrice'])
+    proxy, ref_proxy = row['Proxy'], float(row['RefProxy'])
+    ph = hists.get(proxy) if proxy else None
+    number = t[:-3] if t.endswith('.TA') else t
+    if ph is not None and float(row['RefPrice']) > 0 and ref_proxy > 0:
+        h = ph.copy()
+        h[OHLC] = h[OHLC] * (ref_price / ref_proxy)
+        h['Volume'] = 0.0
+        snap = build_snapshot(t, h, {'quoteType': 'ETF'})
+        snap.update(name=f"הערכה לפי {PROXY_CANDIDATES.get(proxy, proxy)}", sector='—', synthetic='proxy',
+                    proxy=proxy, ref_price=ref_price, number=number)
+        return snap, h
+    today = pd.Timestamp(now_il().date())
+    h = pd.DataFrame({c: [ref_price, ref_price] for c in OHLC} | {'Volume': [0.0, 0.0]},
+                     index=[today - pd.offsets.BDay(1), today])
+    source = 'manual' if float(row['RefPrice']) > 0 else 'cost'
+    snap = build_snapshot(t, h, {'quoteType': 'ETF'})
+    snap.update(name="מחיר ידני" if source == 'manual' else "ללא מחיר שוק — לפי מחיר הקנייה", sector='—',
+                synthetic=source, proxy='', ref_price=ref_price, number=number)
+    return snap, None
+
 def apply_trade(portfolio, ticker, action, qty, price):
     """Returns (new_portfolio, executed_qty, realized_pnl_in_quote_currency)."""
     p = portfolio.copy()
@@ -821,9 +847,14 @@ def apply_trade(portfolio, ticker, action, qty, price):
         if ticker in p.index:
             oq, op = float(p.loc[ticker, 'Quantity']), float(p.loc[ticker, 'PurchasePrice'])
             nq = oq + qty
-            p.loc[ticker, ['Quantity', 'PurchasePrice']] = [nq, (oq * op + qty * price) / nq]
+            p.loc[ticker, 'Quantity'] = nq
+            p.loc[ticker, 'PurchasePrice'] = (oq * op + qty * price) / nq
         else:
-            p.loc[ticker] = [float(qty), float(price)]
+            new_row = {c: 0.0 for c in p.columns}
+            new_row.update(Quantity=float(qty), PurchasePrice=float(price))
+            if 'Proxy' in new_row:
+                new_row['Proxy'] = ''
+            p.loc[ticker] = pd.Series(new_row)
         return p, qty, 0.0
     if ticker not in p.index:
         return p, 0.0, 0.0
@@ -935,6 +966,8 @@ def resolve_single(text, market='auto'):
         h = download_history((cand,), '1mo').get(cand)
         if h is not None:
             return cand, float(h['Close'].iloc[-1])
+    if t.isdigit():
+        return f"{t}.TA", None  # TASE security number (מספר נייר) that Yahoo doesn't carry
     return t, None
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -1119,14 +1152,25 @@ def price_chart(hist, bars, cost=None, sym='$', candles=False):
     fig.update_yaxes(showgrid=False, showticklabels=False, row=2, col=1)
     return fig
 
+def price_note(s, t):
+    src = s.get('synthetic')
+    if src == 'proxy':
+        return (f"הערכה: עוקב אחר {PROXY_CANDIDATES.get(s['proxy'], s['proxy'])} ממחיר ייחוס {money(s['ref_price'], s['sym'])} "
+                "· לא כולל דמי ניהול ופערי מעקב")
+    if src == 'manual':
+        return f"מחיר ידני {money(s['ref_price'], s['sym'])} — מתעדכן רק כשמעדכנים אותו"
+    if src == 'cost':
+        return "אין מחיר שוק — מוצג לפי מחיר הקנייה"
+    return f"מחיר אחרון מ-{s['last_date']:%d.%m.%Y}" + (" · מחירים בשקלים" if is_ils(t) else "")
+
 def render_stock_detail(t, s, hist, pos=None, key='detail'):
     sym = s['sym']
     chip = f'<span class="chip">{exchange_label(t)}</span>' if exchange_label(t) else ''
     sector = f" · {s['sector']}" if s['sector'] and s['sector'] != '—' else ''
     st.markdown(f'<div class="hero" style="margin-top:6px"><div><span class="row-ticker" style="font-size:1.4rem">{esc(t)}</span>{chip}</div>'
                 f'<div class="row-name" style="font-size:0.8rem">{esc(s["name"])}{esc(sector)}</div>'
-                f'<div class="stamp">מחיר אחרון מ-{s["last_date"]:%d.%m.%Y}{" · מחירים בשקלים" if is_ils(t) else ""}</div></div>',
-                unsafe_allow_html=True)
+                f'<div class="stamp">{esc(price_note(s, t))}</div></div>', unsafe_allow_html=True)
+    synth = s.get('synthetic')
 
     c1, c2 = st.columns(2)
     c1.metric("מחיר", money(s['price'], sym), f"{pct(s['rets']['1d'])} ({signed_money(s['day_chg'], sym, 2)})")
@@ -1140,6 +1184,9 @@ def render_stock_detail(t, s, hist, pos=None, key='detail'):
     else:
         c2.metric("מתחילת השנה", pct(s['rets']['ytd']), signed_money(s['price'] - s['bases']['ytd'], sym, 2))
 
+    if hist is None or synth in ('manual', 'cost'):
+        st.caption("ל-Yahoo אין נתונים על נייר זה, ולכן אין גרף. אפשר לקבוע מעקב לפי מדד: ניהול → עסקאות ועריכה → ניירות ללא מחיר שוק.")
+        return
     strip([(lbl, pct(s['rets'][k], 1), '', tone(s['rets'][k])) for lbl, k in
            (("יום", '1d'), ("שבוע", '1w'), ("חודש", '1m'), ("3 חודשים", '3m'), ("מתחילת שנה", 'ytd'), ("שנה", '1y'))])
     range_bar(s['lo52'], s['hi52'], s['price'], sym)
@@ -1151,6 +1198,8 @@ def render_stock_detail(t, s, hist, pos=None, key='detail'):
                                  label_visibility='collapsed') or "קו"
     st.plotly_chart(price_chart(hist, CHART_BARS[period], pos['avg'] if pos else None, sym, style == "נרות"),
                     width='stretch', config={"displayModeBar": False}, key=f'{key}_chart_{t}')
+    if synth == 'proxy':
+        return
 
     if 'rsi' in s:
         st.markdown(f'<div class="stamp">{esc(s["trend"])} · RSI {s["rsi"]:.0f} · '
@@ -1232,6 +1281,23 @@ w_tickers = watch['Ticker'].tolist()
 
 with st.spinner("טוען את התיק..."):
     hists, snaps = load_market(tuple(sorted(set(p_tickers + w_tickers + ['SPY']))), True)
+    hists, snaps = dict(hists), dict(snaps)  # copies: never mutate cached results
+    needs_pricing = [t for t in p_tickers if t not in snaps]
+    proxy_hists = {}
+    if needs_pricing:
+        proxy_hists = download_history(tuple(sorted(PROXY_CANDIDATES)), '2y')
+    synthetic = {}
+    for t in needs_pricing:
+        snap, h = synthetic_snapshot(t, portfolio.loc[t], proxy_hists)
+        snaps[t] = snap
+        synthetic[t] = snap['synthetic']
+        if h is not None:
+            hists[t] = h
+# one entry per index (first symbol that Yahoo actually returns data for)
+available_proxies = {}
+for sym_, label_ in PROXY_CANDIDATES.items():
+    if sym_ in proxy_hists and label_ not in available_proxies.values():
+        available_proxies[sym_] = label_
 
 positions, missing = compute_positions(portfolio, snaps, usd_ils)
 cash_total = cfg['cash_usd'] + cfg['cash_ils'] / usd_ils
@@ -1305,8 +1371,10 @@ with t_today:
         strip([(name, f"{sym}{market[t]['price']:,.2f}", pct(market[t]['rets']['1d']), tone(market[t]['rets']['1d']))
                for t, (name, sym) in MARKET_TICKERS.items() if t in market])
 
-    if missing:
-        st.warning(f"לא התקבלו נתונים עבור: {', '.join(missing)}. מניות ת״א נשמרות עם הסיומת ‎.TA (למשל LUMI.TA) — אפשר לתקן בלשונית ניהול.")
+    unpriced = [t for t, src in synthetic.items() if src == 'cost']
+    if unpriced:
+        st.warning(f"ל-Yahoo אין מחיר עבור {', '.join(unpriced)}, ולכן הם מוצגים לפי מחיר הקנייה. "
+                   "להגדרת מעקב לפי מדד או מחיר ידני: ניהול → עסקאות ועריכה → ניירות ללא מחיר שוק.")
 
     # ── Needs attention ──
     with st.spinner("בודק דוחות רווחים..."):
@@ -1443,7 +1511,7 @@ with t_pos:
             section("פיזור התיק")
             st.plotly_chart(fig_pie, width='stretch', config={"displayModeBar": False}, key='alloc_pie')
         else:
-            render_stock_detail(choice, snaps[choice], hists[choice], pos_by_ticker[choice], key='pos')
+            render_stock_detail(choice, snaps[choice], hists.get(choice), pos_by_ticker[choice], key='pos')
 
 # ==========================================
 # TAB: SEARCH
@@ -1715,6 +1783,11 @@ with t_manage:
                     st.error(f"{tr_ticker} לא נמצאת בתיק.")
                 else:
                     new_port, done, realized = apply_trade(portfolio, tr_ticker, action, tr_qty, price)
+                    if action == 'buy' and (tr_ticker in synthetic or (last is None and tr_price > 0 and tr_ticker not in snaps)):
+                        # No market price for this holding: the price just paid becomes its reference price
+                        px = new_port.loc[tr_ticker, 'Proxy']
+                        new_port.loc[tr_ticker, 'RefPrice'] = float(price)
+                        new_port.loc[tr_ticker, 'RefProxy'] = float(proxy_hists[px]['Close'].iloc[-1]) if px in proxy_hists else 0.0
                     st.session_state.portfolio = new_port
                     st.session_state.editor_ver += 1
                     statuses = [save_portfolio(new_port)]
@@ -1743,9 +1816,43 @@ with t_manage:
                 st.metric("רווח ממומש מצטבר", signed_money(total_realized, '$', 2))
                 st.dataframe(trades.iloc[::-1], width='stretch', hide_index=True)
 
+        if synthetic:
+            section("ניירות ללא מחיר שוק",
+                    "ל-Yahoo אין נתונים עליהם. הזן/י את המחיר הנוכחי מהברוקר; אם הנייר עוקב אחרי מדד — בחר/י אותו, והמחיר יתעדכן לפי שינויי המדד מעכשיו.")
+            if not available_proxies:
+                st.caption("כרגע לא התקבלו מ-Yahoo נתוני מדדי ת״א, ולכן זמין רק מחיר ידני.")
+            proxy_opts = [''] + list(available_proxies)
+            for t in synthetic:
+                row = portfolio.loc[t]
+                with st.form(f'pricing_{t}'):
+                    st.markdown(f'<div><span class="row-ticker">{esc(t)}</span></div>'
+                                f'<div class="row-name" style="white-space:normal">{esc(price_note(snaps[t], t))}</div>', unsafe_allow_html=True)
+                    f1, f2 = st.columns(2)
+                    current = row['Proxy'] if row['Proxy'] in available_proxies else ''
+                    sel = f1.selectbox("מעקב לפי", proxy_opts, index=proxy_opts.index(current), key=f'proxy_{t}',
+                                       format_func=lambda x: available_proxies.get(x, 'ללא — מחיר ידני'))
+                    unit = f2.number_input(f"מחיר נוכחי ליחידה ({'₪' if is_ils(t) else '$'})", min_value=0.0,
+                                           value=float(round(snaps[t]['price'], 2)), step=0.01, format="%.2f", key=f'unit_{t}',
+                                           help="בשקלים ולא באגורות: 38,000 אג׳ = 380 ₪.")
+                    if st.form_submit_button("שמור מחיר", width='stretch'):
+                        if unit <= 0:
+                            st.error("הזן/י מחיר גדול מאפס.")
+                        else:
+                            new_port = portfolio.copy()
+                            new_port.loc[t, 'Proxy'] = sel
+                            new_port.loc[t, 'RefPrice'] = float(unit)
+                            new_port.loc[t, 'RefProxy'] = float(proxy_hists[sel]['Close'].iloc[-1]) if sel else 0.0
+                            st.session_state.portfolio = new_port
+                            st.session_state.editor_ver += 1
+                            kind, msg = SAVE_MSG[save_portfolio(new_port)]
+                            how = f"עוקב אחר {available_proxies[sel]}" if sel else "מחיר ידני"
+                            flash(kind, f"{t}: {how} ממחיר {money(unit, '₪' if is_ils(t) else '$')}. {msg}")
+                            st.rerun()
+
         section("עריכה ישירה של התיק", "שנה/י כמות או מחיר קנייה, הוסף/י או מחק/י שורות ושמור/י. מחיר קנייה של מניות ת״א בשקלים.")
         edited = st.data_editor(
             portfolio.reset_index(), num_rows="dynamic", width='stretch', hide_index=True,
+            column_order=('Ticker', 'Quantity', 'PurchasePrice'),
             key=f"portfolio_editor_{st.session_state.editor_ver}",
             column_config={
                 'Ticker': st.column_config.TextColumn('סימול', required=True),
