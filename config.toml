@@ -1,0 +1,26 @@
+[theme]
+base = "dark"
+primaryColor = "#FAFAFA"
+backgroundColor = "#09090B"
+secondaryBackgroundColor = "#18181B"
+textColor = "#FAFAFA"
+borderColor = "#27272A"
+showWidgetBorder = true
+baseRadius = "8px"
+buttonRadius = "8px"
+greenColor = "#22C55E"
+redColor = "#EF4444"
+blueColor = "#60A5FA"
+linkColor = "#FAFAFA"
+font = "Geist:https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap, Heebo, sans-serif"
+codeFont = "Geist Mono:https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap, monospace"
+baseFontSize = 15
+metricValueFontSize = "1.4rem"
+metricValueFontWeight = 600
+headingFontWeights = 600
+dataframeBorderColor = "#27272A"
+dataframeHeaderBackgroundColor = "#111113"
+chartCategoricalColors = ["#FAFAFA", "#60A5FA", "#22C55E", "#F59E0B", "#A78BFA", "#A1A1AA"]
+
+[client]
+toolbarMode = "minimal"
