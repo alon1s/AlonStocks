@@ -95,6 +95,8 @@ st.markdown("""
     .live { display:inline-flex; align-items:center; gap:8px; font-size:0.74rem; color:var(--muted-foreground); }
     .live-dot { position:relative; width:7px; height:7px; border-radius:50%; background:var(--gain); flex:none; }
     .live-dot::after { content:''; position:absolute; inset:0; border-radius:50%; background:var(--gain); animation:ping 2s cubic-bezier(0,0,.2,1) infinite; }
+    .live-dot.ext { background:var(--warn); }
+    .live-dot.ext::after { background:var(--warn); }
     .live-dot.closed { background:var(--faint); }
     .live-dot.closed::after { display:none; }
     @keyframes ping { 75%, 100% { transform:scale(2.6); opacity:0; } }
@@ -538,6 +540,76 @@ def get_infos(tickers):
         return {}
     with ThreadPoolExecutor(max_workers=6) as ex:
         return dict(ex.map(one, tickers))
+
+NY_TZ = ZoneInfo("America/New_York")
+EXT_LABEL = {'pre': 'פרה־מרקט', 'post': 'אפטר־מרקט'}
+
+@st.cache_data(ttl=120, show_spinner=False)
+def get_extended_quotes(tickers):
+    """Last print per US ticker from 1-minute bars that include pre-/post-market trades.
+    Returns {ticker: {'price': float, 'time': ISO string in New York time}}."""
+    tickers = [t for t in tickers if t and not is_ils(t) and not t.startswith('^') and '=' not in t]
+    if not tickers:
+        return {}
+    try:
+        raw = yf.download(tickers, period='5d', interval='1m', prepost=True, auto_adjust=False, progress=False, threads=True)
+    except Exception:
+        return {}
+    if raw is None or raw.empty:
+        return {}
+    out = {}
+    for t in tickers:
+        try:
+            if isinstance(raw.columns, pd.MultiIndex):
+                if t not in raw.columns.get_level_values(-1):
+                    continue
+                close = raw.xs(t, axis=1, level=-1)['Close']
+            elif len(tickers) == 1:
+                close = raw['Close']
+            else:
+                continue
+            close = close.dropna()
+            close = close[close > 0]
+            if close.empty:
+                continue
+            ts = close.index[-1]
+            ts = ts.tz_localize('UTC') if ts.tzinfo is None else ts
+            out[t] = {'price': float(close.iloc[-1]), 'time': ts.tz_convert(NY_TZ).isoformat()}
+        except Exception:
+            continue
+    return out
+
+def _session_of(ts):
+    """'pre' (04:00-09:30), 'reg' (09:30-16:00) or 'post' (16:00 on) in New York time."""
+    minutes = ts.hour * 60 + ts.minute
+    return 'pre' if minutes < 570 else ('reg' if minutes < 960 else 'post')
+
+def build_extended(raw, hists):
+    """Pre-/post-market move per ticker versus the regular close, plus {'session','time'} for the latest print.
+    Only prints from the newest extended session count, so a stock with no trades yet this session is skipped
+    rather than showing yesterday's after-hours move."""
+    stamps = {t: pd.Timestamp(v['time']) for t, v in raw.items()}
+    if not stamps:
+        return {}, None
+    latest = max(stamps.values())
+    session = _session_of(latest)
+    if session == 'reg' or (pd.Timestamp(datetime.now(NY_TZ)) - latest) > pd.Timedelta(days=4):
+        return {}, None
+    quotes = {}
+    for t, ts in stamps.items():
+        hist = hists.get(t)
+        if hist is None or len(hist) < 2 or ts.date() != latest.date() or _session_of(ts) != session:
+            continue
+        closes = hist['Close']
+        prior = closes[closes.index.date <= ts.date()] if session == 'post' else closes[closes.index.date < ts.date()]
+        if prior.empty:
+            continue
+        ref, price = float(prior.iloc[-1]), raw[t]['price']
+        if ref <= 0:
+            continue
+        quotes[t] = {'price': price, 'ref': ref, 'chg': price - ref, 'pct': (price / ref - 1) * 100,
+                     'session': session, 'time': ts.tz_convert(TZ)}
+    return quotes, ({'session': session, 'time': latest.tz_convert(TZ)} if quotes else None)
 
 def compute_indicators(hist):
     close, high, low, vol = hist['Close'], hist['High'], hist['Low'], hist['Volume']
@@ -1198,6 +1270,11 @@ def render_stock_detail(t, s, hist, pos=None, key='detail'):
                 f'<div class="row-name" style="font-size:0.8rem">{esc(s["name"])}{esc(sector)}</div>'
                 f'<div class="stamp">{esc(price_note(s, t))}</div></div>', unsafe_allow_html=True)
     synth = s.get('synthetic')
+    q = ext_q.get(t)
+    if q:
+        st.markdown(f'<div class="badges" style="margin:0 0 10px"><span class="badge"><span class="num ltr" style="color:{tone(q["chg"])}">'
+                    f'{esc(money(q["price"], sym))} ({esc(pct(q["pct"]))})</span>'
+                    f'{esc(EXT_LABEL[q["session"]])} · {q["time"]:%H:%M}</span></div>', unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     c1.metric("מחיר", money(s['price'], sym), f"{pct(s['rets']['1d'])} ({signed_money(s['day_chg'], sym, 2)})")
@@ -1326,6 +1403,10 @@ for sym_, label_ in PROXY_CANDIDATES.items():
     if sym_ in proxy_hists and label_ not in available_proxies.values():
         available_proxies[sym_] = label_
 
+# pre-/post-market prints (US tickers only; TASE has no extended session)
+ext_tickers = tuple(sorted(t for t in set(p_tickers + w_tickers) if t in hists and not is_ils(t) and t not in synthetic))
+ext_q, ext_meta = build_extended(get_extended_quotes(ext_tickers), hists) if ext_tickers else ({}, None)
+
 positions, missing = compute_positions(portfolio, snaps, usd_ils)
 cash_total = cfg['cash_usd'] + cfg['cash_ils'] / usd_ils
 stock_value = sum(r['value'] for r in positions)
@@ -1359,9 +1440,19 @@ def wall_street_open(market):
     return in_hours and traded_today
 
 is_open = wall_street_open(market)
+# extended session is "live" only while the latest print is fresh and still belongs to the current NY session
+ext_live = bool(ext_meta and not is_open
+                and (now_il() - ext_meta['time']) < pd.Timedelta(minutes=25)
+                and _session_of(pd.Timestamp(datetime.now(NY_TZ))) == ext_meta['session'])
+if is_open:
+    status_txt, dot_cls = "וול סטריט פתוחה", ""
+elif ext_live:
+    status_txt, dot_cls = f"{EXT_LABEL[ext_meta['session']]} פעיל", " ext"
+else:
+    status_txt, dot_cls = "וול סטריט סגורה", " closed"
 st.markdown(f'<div class="topbar"><span class="wordmark">AlonStocks Pro</span>'
-            f'<span class="live"><span class="live-dot{"" if is_open else " closed"}"></span>'
-            f'{"וול סטריט פתוחה" if is_open else "וול סטריט סגורה"} · {now_il():%H:%M}</span></div>', unsafe_allow_html=True)
+            f'<span class="live"><span class="live-dot{dot_cls}"></span>'
+            f'{status_txt} · {now_il():%H:%M}</span></div>', unsafe_allow_html=True)
 
 t_today, t_pos, t_search, t_watch, t_earn, t_manage = st.tabs(
     ["היום", "פוזיציות", "חיפוש", "מעקב", "דוחות", "ניהול"])
@@ -1376,6 +1467,12 @@ with t_today:
     spy_day = market.get('SPY', {}).get('rets', {}).get('1d')
     badges = [badge(f"{signed_money(day_pl)} ({pct(day_pct)})", "היום", tone(day_pl)),
               badge(f"{signed_money(total_return)} ({pct(total_return_pct, 1)})", "מאז ההפקדה", tone(total_return))]
+    held_ext = [(r, ext_q[r['ticker']]) for r in positions if r['ticker'] in ext_q]
+    if held_ext:
+        ext_pl = sum(r['qty'] * q['chg'] for r, q in held_ext)
+        ext_base = sum(r['qty'] * q['ref'] for r, q in held_ext)
+        badges.insert(1, badge(f"{signed_money(ext_pl)} ({pct(ext_pl / ext_base * 100 if ext_base else 0)})",
+                               EXT_LABEL[ext_meta['session']], tone(ext_pl)))
     if spy_day is not None:
         badges.append(badge(pct(spy_day), "S&P 500", tone(spy_day)))
     st.markdown(f'<div class="hero"><div class="hero-label">שווי תיק כולל</div>'
@@ -1454,6 +1551,28 @@ with t_today:
             pct(unreal_total / cost_total * 100 if cost_total else 0, 1), tone(unreal_total),
             caption=f"{iso(signed_money(unreal_total))} כולל", total=True))
         render_ledger(rows_html)
+
+        # ── Pre-/post-market ──
+        if held_ext:
+            lbl = EXT_LABEL[ext_meta['session']]
+            when = ext_meta['time']
+            day_txt = '' if when.date() == now.date() else f"יום {DAYS_HE[when.weekday()]} "
+            section(f"{lbl} — מחוץ לשעות המסחר",
+                    f"מחיר אחרון {day_txt}{when:%H:%M} (שעון ישראל), מול הסגירה הרגילה. בנפח נמוך המחירים קופצים ויכולים להטעות.")
+            ext_rows = [ledger_row(
+                r['ticker'], r['name'][:26], money(q['price'], r['sym']),
+                f"{pct(q['pct'])}  {signed_money(r['qty'] * q['chg'])}", tone(q['chg']),
+                money(q['ref'], r['sym']), TEXT_DIM, caption="סגירה רגילה")
+                for r, q in sorted(held_ext, key=lambda x: abs(x[1]['pct']), reverse=True)]
+            if len(held_ext) > 1:
+                ext_rows.append(ledger_row(
+                    "סה״כ", f"{len(held_ext)} פוזיציות", money(sum(r['qty'] * q['price'] for r, q in held_ext), '$', 0),
+                    f"{pct(ext_pl / ext_base * 100 if ext_base else 0)}  {signed_money(ext_pl)}", tone(ext_pl),
+                    money(ext_base, '$', 0), TEXT_DIM, caption="סגירה רגילה", total=True))
+            render_ledger(ext_rows)
+            missing_ext = [r['ticker'] for r in positions if r['ticker'] not in ext_q and not is_ils(r['ticker'])]
+            if missing_ext:
+                st.caption("ללא מסחר מורחב כרגע: " + ', '.join(missing_ext))
 
         # ── Period performance ──
         section("ביצועים לפי תקופה", "לפי הכמויות שמוחזקות כרגע, ללא מזומן")
@@ -1683,7 +1802,9 @@ with t_watch:
                     w['Ticker'], w['Notes'] or s['name'][:26], money(s['price'], s['sym']),
                     f"{pct(s['rets']['1d'])} היום", tone(s['rets']['1d']),
                     f"{pct(s['rets']['1w'], 1)} שבוע", tone(s['rets']['1w']),
-                    caption=f"חודש {iso(pct(s['rets']['1m'], 1))}" + (f" · התראה: {alerts_txt}" if alerts_txt else '')))
+                    caption=(f"{EXT_LABEL[ext_q[w['Ticker']]['session']]} {iso(pct(ext_q[w['Ticker']]['pct']))}"
+                             if w['Ticker'] in ext_q else f"חודש {iso(pct(s['rets']['1m'], 1))}")
+                    + (f" · התראה: {alerts_txt}" if alerts_txt else '')))
             else:
                 rows_html.append(ledger_row(w['Ticker'], w['Notes'], "—", "אין נתונים", TEXT_DIM, "—", TEXT_DIM))
         render_ledger(rows_html)
